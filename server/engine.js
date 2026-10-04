@@ -379,7 +379,6 @@ function rogueVersion(card) {
   const variants = {
     attack: { id: 'rogue-backstab', name: 'Backstab', text: 'Deal 2 damage. Rogues may target a player.', effect: { damage: 2, range: 1, target: 'any' } },
     defense: { id: 'rogue-fade', name: 'Fade Away', text: 'Gain 2 guard and become hard to target.', effect: { shield: 2, buff: 'evasion' } },
-    movement: { id: 'rogue-shadowstep', name: 'Shadowstep', text: 'Move up to 2 tiles through walls.', effect: { move: 2, teleport: true } },
     skill: { id: 'rogue-lift-purse', name: 'Lift Purse', text: 'Steal a consumable from an adjacent player or draw a card.', effect: { stealItem: true, range: 1, draw: 1, target: 'any' } }
   };
   return variants[card.category] || variants.skill;
