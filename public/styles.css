@@ -135,5 +135,46 @@
   .action-row{gap:5px}.action-row .button{height:37px;padding:0 8px;font-size:8px}.turn-caption{font-size:8px;gap:5px}
   .tutorial-view{padding-left:8px;padding-right:8px}.tutorial-top{align-items:flex-start}.tutorial-top h1{font-size:20px}.tutorial-top .button{height:36px;padding:0 8px;font-size:8px}.tutorial-board{padding:8px}.tutorial-map{width:min(100%,min(38svh,320px))}.tutorial-hand{gap:5px}.tutorial-card{min-height:92px;padding:7px}.tutorial-card b{font-size:8px}.tutorial-card span{font-size:7px}
 }
+
+/* Playtest polish: chat, persistent rules access, readable combat effects. */
+.name-limit{display:block;margin:-4px 0 12px;color:#8c9688;font:7px var(--mono);letter-spacing:.06em}
+.card-range{display:inline-flex;align-self:flex-start;margin-top:7px;padding:3px 6px;border:1px solid #815b4e;background:#3b2924;color:#f0baaa;font:8px var(--mono);letter-spacing:.07em}
+.discard-move-card{min-height:27px;border:1px solid #526b5b;border-top:0;background:#25352b;color:#c0d5bd;font:7px var(--mono);letter-spacing:.04em;cursor:pointer}
+.discard-move-card:hover:not(:disabled){background:#344b3c;color:#e5efd9}
+.discard-move-card:disabled{opacity:.4;cursor:not-allowed}
+.foe-effects{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px}
+.foe-status-empty{font:7px var(--mono);color:#777f73}
+.enemy-log-line{border-left:2px solid #c17c69;padding-left:8px;color:#e8c8bb!important;background:#372a261f}
+.enemy-log-tag{color:#e79783;font:7px var(--mono);letter-spacing:.09em}
+.enemy-action-popups{margin:10px 0;padding:9px 10px;border:1px solid #a7695d;background:linear-gradient(110deg,#382825,#29231f);box-shadow:0 5px 18px #0004}
+.enemy-action-popups.hidden{display:none}
+.enemy-alert-heading{display:flex;align-items:center;justify-content:space-between;color:#f0b6a5;font:8px var(--mono);letter-spacing:.1em;margin-bottom:5px}
+.enemy-alert-heading button{width:23px;height:22px;border:1px solid #835a4f;background:#261d1b;color:#f0d9ca;font-size:17px;line-height:1;cursor:pointer}
+.enemy-alert{padding:6px 2px;border-top:1px solid #69453e;color:#f0dfd0;font-size:9px;line-height:1.45}
+.enemy-alert small{display:block;margin-top:3px;color:#c2a99b;font-size:8px}
+.rules-button{position:fixed;right:18px;bottom:18px;z-index:30;width:auto;min-height:42px;justify-content:center;padding:9px 13px;box-shadow:0 4px 18px #0008}
+.rules-button .rules-icon{font-size:14px}
+.chat-panel{padding:16px 15px;min-height:250px;display:flex;flex-direction:column}
+.chat-messages{display:flex;flex:1;min-height:130px;max-height:300px;overflow:auto;flex-direction:column;gap:7px;margin:10px 0;padding-right:3px}
+.chat-message{display:flex;flex-direction:column;align-items:flex-start;gap:3px;max-width:92%;padding:7px 9px;border:1px solid #3e493e;background:#202820;color:#dcdccc;font-size:10px;line-height:1.4;overflow-wrap:anywhere}
+.chat-message b{color:#b9cbaa;font:8px var(--mono);letter-spacing:.04em}
+.chat-message.mine{align-self:flex-end;border-color:#5a644a;background:#2a3025}
+.chat-message.mine b{color:#e0c487}
+.chat-empty{align-self:center;margin:auto;text-align:center;color:#899183;font-size:9px;line-height:1.5}
+.chat-form{display:flex;gap:7px;margin-top:auto}
+.chat-form .text-input{min-width:0;height:37px;padding:8px 10px;font-size:10px}
+.chat-form .button{min-height:37px;padding:0 11px;font-size:8px}
+.mobile-tabs button[data-mobile-tab="chat"]{color:#abc7b6}
+@media(max-width:1000px){
+  .mobile-tabs{grid-template-columns:repeat(7,minmax(0,1fr))}
+  .chat-panel[data-mobile-pane="chat"]{max-height:calc(100svh - 145px);min-height:calc(100svh - 160px);overflow:hidden}
+  .chat-messages{max-height:none;min-height:0}
+  .rules-button{right:8px;bottom:calc(58px + env(safe-area-inset-bottom));min-height:35px;padding:6px 9px;font-size:8px}
+}
+@media(max-width:560px){
+  .mobile-tabs button{font-size:6px;letter-spacing:0}
+  .game-view{padding-bottom:calc(68px + env(safe-area-inset-bottom))}
+  .rules-button{bottom:calc(53px + env(safe-area-inset-bottom))}
+}
 .leave-game{height:31px;min-width:49px;justify-content:center;padding:0 8px;border-color:#5c5143;color:#d6c2a1;font-size:8px}
 @media(max-width:560px){.leave-game{height:28px;min-width:41px;padding:0 5px;font-size:7px}.room-tools{gap:6px}.room-code-box{padding-right:6px}}

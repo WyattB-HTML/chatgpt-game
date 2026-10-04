@@ -5,7 +5,7 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   const CLASS_ORDER = ['Wizard', 'Weaver', 'Barbarian', 'Ranger', 'Swordsman', 'Knight'];
   const CLASSES = {
-    Wizard: { icon: '✧', hp: 8, color: '#a78bd2', role: 'Spell slinger', passive: 'Once per round, the first spell that hits an enemy also hits one other foe beside it.' },
+    Wizard: { icon: '✧', hp: 8, color: '#a78bd2', role: 'Spell slinger', passive: 'Unique spell attacks gain +1 range. Once per round, the first spell that hits an enemy also hits one other foe beside it.' },
     Weaver: { icon: '❋', hp: 10, color: '#7bbfa9', role: 'Mender & hexer', passive: 'Healing restores +1 HP; when you heal an ally, gain 1 guard.' },
     Barbarian: { icon: '⚒', hp: 16, color: '#d57955', role: 'Front-line breaker', passive: 'Reduce the first damage you take each round by 1.' },
     Ranger: { icon: '➶', hp: 9, color: '#94ad65', role: 'Mobile marksman', passive: 'Ranged attacks gain +1 range; your first move each round goes 1 tile farther.' },
@@ -22,14 +22,13 @@
     return fallback;
   };
   const C = (id, name, category, text, effect, extra = {}) => ({ id, name, category: effectCategory(effect, category), text, effect: { ...effect }, copies: 3, ...extra });
-  const RE = (id, name, category, text, effect, response, extra = {}) => ({ id, name, category: effectCategory(effect, category), text, effect: { ...effect }, copies: 1, outOfTurn: true, response, ...extra });
   const DECKS = {
     Wizard: [
-      RE('warding-flash', 'Warding Flash', 'defense', 'When you are attacked: prevent 2 damage.', { shield: 2 }, 'self_attacked'),
-      RE('spell-turn', 'Spellturn', 'skill', 'When an ally is hit by a ranged attack: cancel it.', { cancelRanged: true }, 'ally_ranged_hit'),
-      RE('arcane-snap', 'Arcane Snap', 'attack', 'When a foe enters your row: deal 2 damage at range 3.', { damage: 2, range: 3 }, 'enemy_moves'),
-      RE('mirror-step', 'Mirror Step', 'movement', 'When attacked: blink 2 tiles away.', { move: 2 }, 'self_attacked'),
-      RE('last-spark', 'Last Spark', 'skill', 'When an ally falls below half HP: give them 2 guard.', { shield: 2 }, 'ally_low_hp'),
+      C('warding-flash', 'Warding Flash', 'defense', 'Gain 2 Guard.', { shield: 2 }, { copies: 1 }),
+      C('spell-turn', 'Arcane Guard', 'defense', 'Gain 3 Guard.', { shield: 3 }, { copies: 1 }),
+      C('arcane-snap', 'Arcane Snap', 'attack', 'Deal 2 damage. Range 3.', { damage: 2, range: 3 }, { copies: 1 }),
+      C('mirror-step', 'Mirror Step', 'movement', 'Move up to 2 tiles.', { move: 2 }, { copies: 1 }),
+      C('last-spark', 'Last Spark', 'defense', 'Give an ally 2 Guard. Range 4.', { shield: 2, range: 4, target: 'ally' }, { copies: 1 }),
       C('fire-bolt', 'Fire Bolt', 'attack', 'Deal 3 damage. Range 4.', { damage: 3, range: 4 }),
       C('frost-ring', 'Frost Ring', 'attack', 'Deal 2 damage and weaken nearby foes.', { damage: 2, range: 2, splash: 1, debuff: 'slow' }),
       C('blink', 'Blink', 'movement', 'Teleport up to 3 tiles; pass through walls.', { move: 3, teleport: true }),
@@ -37,35 +36,35 @@
       C('arcane-lore', 'Arcane Lore', 'skill', 'Draw 2 cards.', { draw: 2 })
     ],
     Weaver: [
-      RE('thread-snare', 'Thread Snare', 'skill', 'When a foe attacks an ally: weaken that foe.', { debuff: 'weak', range: 4 }, 'ally_attacked'),
-      RE('quick-stitch', 'Quick Stitch', 'skill', 'When an ally is hurt: heal them 2 HP.', { heal: 2 }, 'ally_attacked'),
-      RE('woven-aegis', 'Woven Aegis', 'defense', 'When an ally is attacked: give them 3 guard.', { shield: 3 }, 'ally_attacked'),
-      RE('shared-breath', 'Shared Breath', 'skill', 'When an ally falls below half HP: heal them 3.', { heal: 3 }, 'ally_low_hp'),
-      RE('thorn-thread', 'Thorn Thread', 'attack', 'When a foe attacks an ally: strike it for 2 damage.', { damage: 2, range: 4 }, 'ally_attacked'),
+      C('thread-snare', 'Thread Snare', 'skill', 'Weaken a foe. Range 4.', { debuff: 'weak', range: 4 }, { copies: 1 }),
+      C('quick-stitch', 'Quick Stitch', 'skill', 'Heal an ally 2 HP. Range 4.', { heal: 2, range: 4, target: 'ally' }, { copies: 1 }),
+      C('woven-aegis', 'Woven Aegis', 'defense', 'Give an ally 3 Guard. Range 3.', { shield: 3, range: 3, target: 'ally' }, { copies: 1 }),
+      C('shared-breath', 'Shared Breath', 'skill', 'Heal an ally 3 HP. Range 4.', { heal: 3, range: 4, target: 'ally' }, { copies: 1 }),
+      C('thorn-thread', 'Thorn Thread', 'attack', 'Deal 2 damage. Range 4.', { damage: 2, range: 4 }, { copies: 1 }),
       C('mending-thread', 'Mending Thread', 'skill', 'Heal an ally 3 HP. Range 4.', { heal: 3, range: 4, target: 'ally' }),
       C('bright-knot', 'Bright Knot', 'skill', 'Give an ally +1 damage and 2 guard.', { buff: 'fury', shield: 2, range: 4, target: 'ally' }),
       C('thorn-tether', 'Thorn Tether', 'attack', 'Deal 1 damage and weaken a foe. Range 4.', { damage: 1, range: 4, debuff: 'weak' }),
       C('soft-landing', 'Soft Landing', 'defense', 'Give yourself or an ally 3 guard. Range 3.', { shield: 3, range: 3, target: 'ally' }),
-      C('silkstep', 'Silkstep', 'movement', 'Dash 2 tiles.', { move: 2 })
+      C('silkstep', 'Silkstep', 'movement', 'Move up to 2 tiles.', { move: 2 })
     ],
     Barbarian: [
-      RE('stand-between', 'Stand Between', 'defense', 'When an adjacent ally is attacked: take the hit and prevent 2 damage.', { shield: 2, redirect: true }, 'ally_adjacent_attacked'),
-      RE('iron-reflex', 'Iron Reflex', 'defense', 'When attacked: prevent 4 damage.', { shield: 4 }, 'self_attacked'),
-      RE('blood-roar', 'Blood Roar', 'skill', 'When an ally is attacked: taunt nearby foes until your next turn.', { taunt: 2 }, 'ally_attacked'),
-      RE('reaver-counter', 'Reaver Counter', 'attack', 'When hit: strike the attacker for 3 damage.', { damage: 3, range: 1 }, 'self_attacked'),
-      RE('last-stand', 'Last Stand', 'skill', 'When you fall below half HP: gain 4 guard.', { shield: 4 }, 'self_low_hp'),
+      C('stand-between', 'Stone Stance', 'defense', 'Gain 2 Guard.', { shield: 2 }, { copies: 1 }),
+      C('iron-reflex', 'Iron Reflex', 'defense', 'Gain 4 Guard.', { shield: 4 }, { copies: 1 }),
+      C('blood-roar', 'Blood Roar', 'skill', 'Taunt a foe and weaken it. Range 3.', { taunt: 2, debuff: 'weak', range: 3 }, { copies: 1 }),
+      C('reaver-counter', 'Reaver Counter', 'attack', 'Deal 3 damage. Range 1.', { damage: 3, range: 1 }, { copies: 1 }),
+      C('last-stand', 'Last Stand', 'defense', 'Gain 4 Guard.', { shield: 4 }, { copies: 1 }),
       C('wide-cleave', 'Wide Cleave', 'attack', 'Deal 3 damage to a foe and 1 to adjacent foes.', { damage: 3, range: 1, splash: 1, splashDamage: 1 }),
       C('shoulder-rush', 'Shoulder Rush', 'attack', 'Charge up to 2 tiles, then deal 2 damage and push 1. Maximum reach 3.', { damage: 2, range: 1, move: 2, push: 1, charge: true }),
       C('war-cry', 'War Cry', 'skill', 'Taunt foes within 3 tiles and gain 2 guard.', { taunt: 3, shield: 2, range: 3 }),
       C('iron-hide', 'Iron Hide', 'defense', 'Gain 4 guard.', { shield: 4 }),
-      C('warpath', 'Warpath', 'movement', 'Dash 2 tiles.', { move: 2 })
+      C('warpath', 'Warpath', 'movement', 'Move up to 2 tiles.', { move: 2 })
     ],
     Ranger: [
-      RE('sidestep', 'Sidestep', 'movement', 'When targeted by a ranged attack: dash 2 tiles; evade it.', { move: 2, evade: true }, 'self_ranged_targeted'),
-      RE('catch-arrow', 'Catch the Arrow', 'defense', 'When you are hit by a ranged attack: prevent it and return 2 damage.', { shield: 4, damage: 2, range: 5 }, 'self_ranged_hit'),
-      RE('covering-shot', 'Covering Shot', 'attack', 'When a foe attacks an ally: shoot it for 2 damage.', { damage: 2, range: 5 }, 'ally_attacked'),
-      RE('fox-trap', 'Fox Trap', 'skill', 'When a foe enters an adjacent tile: root it and deal 1 damage.', { damage: 1, range: 1, debuff: 'root' }, 'enemy_moves'),
-      RE('parting-shot', 'Parting Shot', 'attack', 'When a foe leaves your range: deal 2 damage.', { damage: 2, range: 5 }, 'enemy_moves'),
+      C('sidestep', 'Canny Guard', 'defense', 'Gain 2 Guard.', { shield: 2 }, { copies: 1 }),
+      C('catch-arrow', 'Catch the Arrow', 'attack', 'Gain 4 Guard and deal 2 damage. Range 5.', { shield: 4, damage: 2, range: 5 }, { copies: 1 }),
+      C('covering-shot', 'Covering Shot', 'attack', 'Deal 2 damage. Range 5.', { damage: 2, range: 5 }, { copies: 1 }),
+      C('fox-trap', 'Fox Trap', 'attack', 'Deal 1 damage and root a foe. Range 1.', { damage: 1, range: 1, debuff: 'root' }, { copies: 1 }),
+      C('parting-shot', 'Measured Shot', 'attack', 'Deal 2 damage. Range 5.', { damage: 2, range: 5 }, { copies: 1 }),
       C('longshot', 'Longshot', 'attack', 'Deal 3 damage. Range 5.', { damage: 3, range: 5 }),
       C('pinning-arrow', 'Pinning Arrow', 'attack', 'Deal 2 damage and root a foe. Range 4.', { damage: 2, range: 4, debuff: 'root' }),
       C('vault', 'Vault', 'movement', 'Leap up to 3 tiles over walls and enemies.', { move: 3, jump: true }),
@@ -73,28 +72,28 @@
       C('marked-prey', 'Marked Prey', 'skill', 'Mark a foe; your next attack deals +2 damage. Range 5.', { debuff: 'marked', range: 5 })
     ],
     Swordsman: [
-      RE('riposte', 'Riposte', 'attack', 'When an adjacent foe attacks you: parry and strike for 3.', { shield: 2, damage: 3, range: 1 }, 'self_adjacent_attacked'),
-      RE('lunge-counter', 'Lunge Counter', 'attack', 'When a foe hits an ally beside you: strike it for 2.', { damage: 2, range: 2 }, 'ally_adjacent_attacked'),
-      RE('measured-guard', 'Measured Guard', 'defense', 'When attacked: gain 3 guard.', { shield: 3 }, 'self_attacked'),
-      RE('passing-cut', 'Passing Cut', 'attack', 'When a foe moves beside you: deal 2 damage.', { damage: 2, range: 1 }, 'enemy_moves'),
-      RE('perfect-parry', 'Perfect Parry', 'defense', 'When an adjacent foe attacks: cancel it and draw 1.', { shield: 4, draw: 1, cancelMelee: true }, 'self_adjacent_attacked'),
+      C('riposte', 'Riposte', 'attack', 'Gain 2 Guard and deal 3 damage. Range 1.', { shield: 2, damage: 3, range: 1 }, { copies: 1 }),
+      C('lunge-counter', 'Lunge', 'attack', 'Deal 2 damage. Range 2.', { damage: 2, range: 2 }, { copies: 1 }),
+      C('measured-guard', 'Measured Guard', 'defense', 'Gain 3 Guard.', { shield: 3 }, { copies: 1 }),
+      C('passing-cut', 'Passing Cut', 'attack', 'Deal 2 damage. Range 1.', { damage: 2, range: 1 }, { copies: 1 }),
+      C('perfect-parry', 'Perfect Parry', 'defense', 'Gain 4 Guard and draw 1 card.', { shield: 4, draw: 1 }, { copies: 1 }),
       C('precise-cut', 'Precise Cut', 'attack', 'Deal 3 damage to one foe. Range 1.', { damage: 3, range: 1 }),
       C('sword-lesson', 'Read the Guard', 'skill', 'Mark a foe and draw 1 card. Range 3.', { debuff: 'marked', range: 3, draw: 1, target: 'enemy' }),
-      C('advance', 'Advance', 'movement', 'Dash up to 2 tiles.', { move: 2 }),
+      C('advance', 'Advance', 'movement', 'Move up to 2 tiles.', { move: 2 }),
       C('guarded-form', 'Guarded Form', 'defense', 'Gain 2 guard and +1 damage on your next attack.', { shield: 2, buff: 'fury' }),
       C('finishing-line', 'Finishing Line', 'attack', 'Deal 4 damage to a foe with half HP or less.', { damage: 4, range: 1, bonusVsWounded: true })
     ],
     Knight: [
-      RE('shield-wall', 'Shield Wall', 'defense', 'When an ally beside you is attacked: give them 4 guard.', { shield: 4 }, 'ally_adjacent_attacked'),
-      RE('bulwark-step', 'Bulwark Step', 'movement', 'When an ally is targeted: move 1 tile and guard them for 2.', { move: 1, shield: 2 }, 'ally_attacked'),
-      RE('shield-retort', 'Shield Retort', 'attack', 'When hit by an adjacent foe: deal 2 and push it 1.', { damage: 2, range: 1, push: 1 }, 'self_adjacent_attacked'),
-      RE('unyielding', 'Unyielding', 'defense', 'When you would be pushed or stunned: ignore it and gain 2 guard.', { shield: 2 }, 'self_attacked'),
-      RE('vow-of-cover', 'Vow of Cover', 'skill', 'When an ally falls below half HP: taunt nearby foes.', { taunt: 2 }, 'ally_low_hp'),
+      C('shield-wall', 'Shield Wall', 'defense', 'Give an adjacent ally 4 Guard.', { shield: 4, target: 'ally', range: 1 }, { copies: 1 }),
+      C('bulwark-step', 'Bulwark Step', 'defense', 'Give an ally 2 Guard. Range 3.', { shield: 2, target: 'ally', range: 3 }, { copies: 1 }),
+      C('shield-retort', 'Shield Retort', 'attack', 'Deal 2 damage and push a foe 1 tile. Range 1.', { damage: 2, range: 1, push: 1 }, { copies: 1 }),
+      C('unyielding', 'Unyielding', 'defense', 'Gain 2 Guard.', { shield: 2 }, { copies: 1 }),
+      C('vow-of-cover', 'Vow of Cover', 'skill', 'Taunt a foe. Range 4.', { taunt: 2, range: 4 }, { copies: 1 }),
       C('shield-bash', 'Shield Bash', 'attack', 'Deal 2 damage, push a foe 2 tiles and daze it. Range 1.', { damage: 2, range: 1, push: 2, debuff: 'daze' }),
       C('linebreaker', 'Linebreaker', 'attack', 'Deal 2 damage and push up to 2 foes 1 tile.', { damage: 2, range: 1, splash: 1, push: 1 }),
       C('brace', 'Brace', 'defense', 'Gain 4 guard; cannot be pushed this round.', { shield: 4, unpushable: true }),
       C('challenge', 'Challenge', 'skill', 'Taunt a foe within 4 tiles and weaken it.', { taunt: 4, debuff: 'weak', range: 4 }),
-      C('shield-charge', 'Shield Charge', 'movement', 'Dash up to 2 tiles.', { move: 2 })
+      C('shield-charge', 'Shield Charge', 'movement', 'Move up to 2 tiles.', { move: 2 })
     ]
   };
 
@@ -144,7 +143,7 @@
     Warlord: [['Commanding Voice', 'Taunt reaches +2 tiles.', 'taunt', 2], ['Iron Formation', 'Adjacent allies gain 2 guard at turn end.', 'allyGuard', 2], ['War Banner', 'All allies deal +1 damage while beside you.', 'adjacentBuff', 1], ['No Retreat', 'You and adjacent allies cannot be pushed.', 'unpushable', 1], ['Punishing Guard', 'Foes that attack you take 2 damage.', 'thorns', 2], ['Rally', 'On a kill, all allies heal 1.', 'killHeal', 1], ['Bastion Roar', 'Taunted foes deal 2 less damage.', 'tauntGuard', 2], ['Stand Together', 'Gain 1 guard per adjacent ally.', 'guard', 1], ['War Tested', 'Reduce boss hits by 2.', 'reduction', 2], ['Lead the Charge', 'Adjacent allies move +1 tile.', 'move', 1]],
     Reaver: [['Blood Drinker', 'Heal 2 on every kill.', 'killHeal', 2], ['Wide Fury', 'Sweeps deal +2 damage.', 'splashDamage', 2], ['Relentless', 'Deal +2 damage below half HP.', 'lowHpDamage', 2], ['Life for Life', 'Heal for half your attack damage.', 'lifesteal', 1], ['Red Harvest', 'A kill grants 2 guard.', 'killGuard', 2], ['Crushing Weight', 'Push +1 tile and deal 1 extra.', 'push', 1], ['Pain into Power', 'When hit, your next attack gains +2 damage.', 'damage', 2], ['Cleave Through', 'Splash attacks chain to 2 foes.', 'splash', 2], ['Last One Standing', 'Deal +2 while no ally is adjacent.', 'damage', 2], ['Feast of Kings', 'Boss kill restores 5 HP.', 'bossHeal', 5]],
     Deadeye: [['Vital Mark', 'Marked foes take +3 ranged damage.', 'debuffDamage', 3], ['Perfect Sight', '+2 attack range.', 'range', 2], ['Piercing Shot', 'Ignore 2 guard.', 'pierce', 2], ['Weak Point', 'Critical hits on bosses deal +2.', 'bossDamage', 2], ['Double Tap', 'First ranged hit can strike again for 1.', 'damage', 1], ['Quarry', 'Keep a target marked between rooms.', 'debuff', 1], ['Quick Reload', 'Draw 1 after a ranged kill.', 'killDraw', 1], ['Still Aim', 'If you do not move, attacks deal +2.', 'damage', 2], ['Poisoned Broadhead', 'Ranged hits apply weak.', 'debuffDamage', 1], ['Last Word', 'Your first attack hits the boss at any range.', 'range', 2]],
-    Windstalker: [['Windwalk', '+2 movement.', 'move', 2], ['Slipstream', 'Ignore walls while dashing.', 'move', 1], ['Smoke Veil', 'Ranged foes cannot target you after you move.', 'evade', 1], ['Rolling Snare', 'Roots splash to neighbors.', 'splash', 1], ['Ghost Step', 'You evade the first hit each turn.', 'evade', 1], ['Roving Aim', 'Deal +1 after moving this turn.', 'damage', 1], ['Tangle Trap', 'Rooted foes lose 2 damage.', 'debuffDamage', 2], ['Swift Hands', 'Draw a card after a 2+ tile move.', 'hitDraw', 1], ['Canny Escape', 'On hit, dash 1 tile.', 'evade', 1], ['Silent Quarry', 'Your debuffed targets cannot retaliate.', 'debuff', 1]],
+    Windstalker: [['Windwalk', '+2 movement.', 'move', 2], ['Slipstream', 'Ignore walls when you move.', 'move', 1], ['Smoke Veil', 'Ranged foes cannot target you after you move.', 'evade', 1], ['Rolling Snare', 'Roots splash to neighbors.', 'splash', 1], ['Ghost Step', 'You evade the first hit each turn.', 'evade', 1], ['Roving Aim', 'Deal +1 after moving this turn.', 'damage', 1], ['Tangle Trap', 'Rooted foes lose 2 damage.', 'debuffDamage', 2], ['Swift Hands', 'Draw a card after a 2+ tile move.', 'hitDraw', 1], ['Canny Escape', 'On hit, move 1 tile.', 'evade', 1], ['Silent Quarry', 'Your debuffed targets cannot retaliate.', 'debuff', 1]],
     Duelist: [['Opening Gambit', 'First hit each round deals +2.', 'damage', 2], ['Unbroken Rhythm', 'Every second hit draws a card.', 'hitDraw', 1], ['Challenge Accepted', 'Focused foe deals 2 less damage.', 'reduction', 2], ['Find the Gap', 'Ignore 1 guard on your focused target.', 'pierce', 1], ['Swift Riposte', 'Parries deal +2 damage.', 'damage', 2], ['Close In', 'Move 1 after each attack.', 'move', 1], ['Finish Clean', 'Focused foes below half take +3 damage.', 'focus', 3], ['Blade Ward', 'Gain 2 guard after a kill.', 'killGuard', 2], ['Perfect Duel', 'Focused boss takes +2 damage.', 'bossDamage', 2], ['Measured Tempo', 'Hand size +1 while only one foe is nearby.', 'hand', 1]],
     'Bounty Hunter': [['Isolate', 'Foes with no adjacent allies take +2.', 'damage', 2], ['No Escape', 'Push targets toward you instead.', 'push', 1], ['Marked Contract', 'Marked foes take +2 from everyone.', 'debuffDamage', 2], ['Clean Finish', 'Gain 2 guard after a kill.', 'killGuard', 2], ['Cut Off', 'Adjacent foes cannot move past you.', 'tauntGuard', 1], ['Hunt Begins', 'Draw 1 when you mark a new foe.', 'hitDraw', 1], ['Executioner', 'Deal +3 to foes below quarter HP.', 'damage', 3], ['Pin Down', 'Your root lasts an extra turn.', 'debuff', 1], ['Cold Pursuit', 'Move 2 toward your focus at turn start.', 'move', 2], ['Dread Presence', 'Isolated foes deal 2 less damage.', 'debuffDamage', 2]],
     Sentinel: [['Aegis', 'Gain 2 guard whenever you defend.', 'shield', 2], ['Safe Haven', 'Adjacent allies reduce damage by 2.', 'allyGuard', 2], ['Wall of Steel', 'Cannot be pushed; reduce all damage by 1.', 'unpushable', 1], ['Counterwall', 'Pushers take 2 damage.', 'thorns', 2], ['Guardian Step', 'Move 1 to an ally targeted by an attack.', 'move', 1], ['Long Guard', 'Guard lasts through the next full round.', 'shield', 1], ['Shielded Company', 'Allies beside you gain +1 guard.', 'adjacentBuff', 1], ['Heavy Plate', 'Reduce boss attacks by 2.', 'reduction', 2], ['Holdfast', 'Enemies beside you deal 2 less damage.', 'tauntGuard', 2], ['Bastion', 'Once per room, ignore all damage from one source.', 'rescue', 1]],
@@ -190,4 +189,3 @@
   const clone = (value) => JSON.parse(JSON.stringify(value));
   return { CLASS_ORDER, CLASSES, DECKS, SUBCLASSES, ABILITIES, SUB_ABILITIES, ITEMS, MODIFIERS, ENEMY_NAMES, getAbilityList, clone };
 });
-

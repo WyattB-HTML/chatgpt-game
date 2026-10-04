@@ -57,25 +57,36 @@ function bindPeer(peer, game, playerId) {
   broadcast(game);
 }
 
+function uniquePlayerName(game, rawName) {
+  const name = String(rawName || '').trim();
+  if (name) return name.slice(0, 18);
+  const used = new Set(game.players.map((player) => player.name.toLowerCase()));
+  let number = game.players.length + 1;
+  while (used.has(`adventurer ${number}`.toLowerCase())) number++;
+  return `Adventurer ${number}`;
+}
+
 function receive(peer, raw) {
   let message;
   try { message = JSON.parse(raw.toString('utf8')); } catch { sendError(peer, 'Could not read that message.'); return; }
   if (message.type === 'create') {
     const playerId = String(message.playerId || crypto.randomUUID()).slice(0, 64);
     const game = Engine.createLobby({ hostId: playerId, name: message.name });
+    game.onStateChange = () => broadcast(game);
     rooms.set(game.code, game); bindPeer(peer, game, playerId); return;
   }
   if (message.type === 'join') {
     const code = roomCode(message.code), game = rooms.get(code);
     if (!game) { sendError(peer, 'No open game has that room code.'); return; }
+    game.onStateChange ||= () => broadcast(game);
     const playerId = String(message.playerId || crypto.randomUUID()).slice(0, 64);
     const existing = game.players.find((player) => player.id === playerId);
     if (existing?.left) { sendError(peer, 'That seat has left the run. A new player can take an open seat before the heist starts.'); return; }
-    if (existing) { bindPeer(peer, game, playerId); return; }
+    if (existing) { Engine.noteJoin(game, playerId, true); bindPeer(peer, game, playerId); return; }
     if (game.phase !== 'lobby') { sendError(peer, 'That run has already begun; reconnect with the seat you used before.'); return; }
     if (game.players.length >= Engine.MAX_PLAYERS) { sendError(peer, 'This party is full.'); return; }
-    const player = Engine.newPlayer({ playerId, name: message.name, colorIndex: game.players.length });
-    game.players.push(player); bindPeer(peer, game, playerId); return;
+    const player = Engine.newPlayer({ playerId, name: uniquePlayerName(game, message.name), colorIndex: game.players.length });
+    game.players.push(player); Engine.noteJoin(game, playerId); bindPeer(peer, game, playerId); return;
   }
   if (message.type === 'leave') {
     if (!peer.roomCode || !peer.playerId) return;
@@ -91,6 +102,17 @@ function receive(peer, raw) {
   if (!peer.roomCode || !peer.playerId) { sendError(peer, 'Create a game or join a room first.'); return; }
   const game = rooms.get(peer.roomCode);
   if (!game) { sendError(peer, 'That game session has expired.'); return; }
+  if (message.type === 'chat') {
+    const text = String(message.text || '').trim().slice(0, 300);
+    if (!text) return;
+    const player = game.players.find((member) => member.id === peer.playerId);
+    if (!player || player.left) { sendError(peer, 'Your seat cannot send chat right now.'); return; }
+    game.chat ||= [];
+    game.chat.push({ id: crypto.randomUUID(), playerId: player.id, name: player.name, text, at: Date.now() });
+    game.chat = game.chat.slice(-100);
+    broadcast(game);
+    return;
+  }
   if (message.type === 'action') {
     const action = { ...message.action, playerId: peer.playerId };
     if (action.kind === 'start' && peer.playerId !== game.hostId) { sendError(peer, 'Only the host can begin the run.'); return; }

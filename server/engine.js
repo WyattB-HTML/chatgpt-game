@@ -3,7 +3,7 @@ const D = require('../public/game-data.js');
 
 const SIZE = 9;
 const MAX_PLAYERS = 6;
-const safeName = (name) => String(name || '').trim().slice(0, 18) || 'Adventurer';
+const safeName = (name, fallback = 'Adventurer') => String(name || '').trim().slice(0, 18) || fallback;
 const id = (prefix = '') => `${prefix}${crypto.randomBytes(5).toString('hex')}`;
 const dist = (a, b) => Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
 const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
@@ -49,10 +49,8 @@ function enemyDeck(name) {
 function baseDeck(className, characterId) {
   const cards = [];
   const basics = [
-    { id: 'step-one', name: 'Step', category: 'movement', text: 'Move 1 tile.', effect: { move: 1 }, copies: 5 },
-    { id: 'step-two', name: 'Stride', category: 'movement', text: 'Move up to 2 tiles.', effect: { move: 2 }, copies: 5 },
-    { id: 'basic-strike', name: 'Basic Strike', category: 'attack', text: 'Deal 1 damage. Range 1.', effect: { damage: 1, range: 1 }, copies: 5 },
-    { id: 'block', name: 'Block', category: 'defense', text: 'Gain 1 guard.', effect: { shield: 1 }, copies: 5 }
+    { id: 'basic-strike', name: 'Basic Strike', category: 'attack', text: 'Deal 1 damage. Range 1.', effect: { damage: 1, range: 1 }, copies: 10 },
+    { id: 'block', name: 'Block', category: 'defense', text: 'Gain 1 guard.', effect: { shield: 1 }, copies: 10 }
   ];
   for (const template of basics) for (let n = 0; n < template.copies; n++) cards.push(makeCard(template, false, characterId));
   for (const template of D.DECKS[className] || D.DECKS.Wizard) {
@@ -65,14 +63,14 @@ function makeCard(template, unique, owner) {
   return {
     uid: id('c'), id: template.id, name: template.name, category: template.category,
     text: template.text, effect: { ...(template.effect || {}) },
-    unique, owner, upgraded: false
+    unique, owner, upgraded: false, rarity: unique ? 2 : 1
   };
 }
 
 function newPlayer({ playerId, name, colorIndex }) {
   const stats = D.CLASSES.Wizard;
   return {
-    id: playerId, name: safeName(name), className: null, disguiseClass: null,
+    id: playerId, name: safeName(name, `Adventurer ${colorIndex + 1}`), className: null, disguiseClass: null,
     subclass: null, level: 1, hp: stats.hp, maxHp: stats.hp, x: [[1, 1], [2, 1], [1, 2], [2, 2], [1, 3], [2, 3]][colorIndex % 6][0], y: [[1, 1], [2, 1], [1, 2], [2, 2], [1, 3], [2, 3]][colorIndex % 6][1],
     dead: false, guard: 0, hand: [], draw: [], discard: [], abilities: [],
     items: [], buffs: [], debuffs: [], stats: { damageDealt: 0, damageTaken: 0, damageHealed: 0, buffsGiven: 0, debuffsGiven: 0 }, ended: false, played: 0, playLimit: 2, nextPlayBonus: 0, categoriesPlayed: [],
@@ -130,7 +128,8 @@ function createRoom(roomNo, players, previousModifier = null) {
     startTurn(p, mod);
     if (enemies.some((enemy) => enemy.boss) && abilityValue(p, 'bossDraw')) { drawCards(p, abilityValue(p, 'bossDraw')); p.runFlags.bossSeen = true; }
   }
-  return { room: roomNo, floor, map, enemies, modifier: mod, round: 1, startedAt: Date.now(), durationRecorded: false, artifact: roomNo === 12 ? 'sealed' : null, exit: { x: 0, y: 4 }, bossName, turnLog: [{ text: `Room ${roomNo}: ${roomLabel(roomNo)}.`, detail: `Room type: ${map.type}. Enemies draw and play one card from their own 15-card deck each round.` }, ...(mod ? [{ text: `Static effect: ${mod.name}.`, detail: `${mod.buff} ${mod.debuff}` }] : [])] };
+  const turnLog = [{ id: 1, text: `Room ${roomNo}: ${roomLabel(roomNo)}.`, detail: `Room type: ${map.type}. Enemies draw and play one card from their own 15-card deck each round.` }, ...(mod ? [{ id: 2, text: `Static effect: ${mod.name}.`, detail: `${mod.buff} ${mod.debuff}` }] : [])];
+  return { room: roomNo, floor, map, enemies, modifier: mod, round: 1, startedAt: Date.now(), durationRecorded: false, artifact: roomNo === 12 ? 'sealed' : null, exit: { x: 0, y: 4 }, bossName, logSequence: turnLog.length, turnLog };
 }
 
 function roomLabel(roomNo) {
@@ -161,8 +160,20 @@ function createLobby({ hostId, name }) {
   const player = newPlayer({ playerId: hostId, name, colorIndex: 0 });
   return {
     code, hostId, createdAt: Date.now(), startedAt: null, roomDurations: [], phase: 'lobby', players: [player], rogueEnabled: false,
-    roomState: null, reward: null, winner: null, lastAction: null
+    roomState: null, reward: null, winner: null, lastAction: null, chat: [], lobbyLog: [{ text: `${player.name} opened the room.` }]
   };
+}
+
+function noteJoin(game, playerId, rejoined = false) {
+  const player = actor(game, playerId);
+  if (!player) return;
+  const message = `${player.name} ${rejoined ? 'rejoined' : 'joined'} the room.`;
+  if (game.roomState) addLog(game, message);
+  else {
+    game.lobbyLog ||= [];
+    game.lobbyLog.push({ text: message });
+    game.lobbyLog = game.lobbyLog.slice(-40);
+  }
 }
 
 function dealClasses(game, rogueEnabled) {
@@ -215,7 +226,6 @@ function publicState(game, viewerId = null) {
       if (playerId !== viewerId) { delete choice.abilityOptions; delete choice.subclassOptions; }
     }
   }
-  delete state.roomState?.reactionPrompt;
   return state;
 }
 
@@ -264,9 +274,11 @@ function leavePlayer(game, playerId) {
   return null;
 }
 
-function addLog(game, message, detail = '') {
-  game.roomState.turnLog.push({ text: message, detail });
+function addLog(game, message, detail = '', kind = 'info') {
+  game.roomState.logSequence = Number(game.roomState.logSequence || 0) + 1;
+  game.roomState.turnLog.push({ id: game.roomState.logSequence, kind, text: message, detail });
   game.roomState.turnLog = game.roomState.turnLog.slice(-35);
+  if (kind === 'enemy') game.onStateChange?.();
 }
 
 function recordRoomDuration(game) {
@@ -325,6 +337,10 @@ function movePlayer(game, player, x, y, card = null) {
   return null;
 }
 
+function discardMoveReach(player, card) {
+  return card.upgraded ? 3 : Number(card.rarity || (card.unique ? 2 : 1));
+}
+
 function pathOpen(room, from, to, maxSteps, occupied = []) {
   const walls = new Set(room.map.walls);
   const blockers = new Set(occupied);
@@ -363,7 +379,7 @@ function rogueVersion(card) {
   const variants = {
     attack: { id: 'rogue-backstab', name: 'Backstab', text: 'Deal 2 damage. Rogues may target a player.', effect: { damage: 2, range: 1, target: 'any' } },
     defense: { id: 'rogue-fade', name: 'Fade Away', text: 'Gain 2 guard and become hard to target.', effect: { shield: 2, buff: 'evasion' } },
-    movement: { id: 'rogue-shadowstep', name: 'Shadowstep', text: 'Dash 2 tiles through walls.', effect: { move: 2, teleport: true } },
+    movement: { id: 'rogue-shadowstep', name: 'Shadowstep', text: 'Move up to 2 tiles through walls.', effect: { move: 2, teleport: true } },
     skill: { id: 'rogue-lift-purse', name: 'Lift Purse', text: 'Steal a consumable from an adjacent player or draw a card.', effect: { stealItem: true, range: 1, draw: 1, target: 'any' } }
   };
   return variants[card.category] || variants.skill;
@@ -425,7 +441,7 @@ function useCard(game, player, action) {
       target = targetByAction(game, action, 'player');
     } else target = targetByAction(game, action, 'enemy');
     if (!target) return 'Choose a living target.';
-    const range = (effect.range || 1) + abilityValue(player, 'range') + itemValue(player, 'range') + (baseClass(player) === 'Ranger' ? 1 : 0) + (game.roomState.modifier?.hero?.range || 0);
+    const range = (effect.range || 1) + abilityValue(player, 'range') + itemValue(player, 'range') + (baseClass(player) === 'Ranger' ? 1 : 0) + (baseClass(player) === 'Wizard' && card.unique ? 1 : 0) + (game.roomState.modifier?.hero?.range || 0);
     const hasAbility = (abilityId) => player.abilities.some((ability) => ability.id === abilityId);
     const abilityPoints = (abilityId) => Number(player.abilities.find((ability) => ability.id === abilityId)?.value || 0);
     const lastWord = target.boss && hasAbility('last-word') && !player.roomFlags.lastWord;
@@ -437,6 +453,7 @@ function useCard(game, player, action) {
     }
     if (dist(player, target) > range && !lastWord) return 'That target is out of range.';
     if (lastWord) player.roomFlags.lastWord = true;
+    if (effect.shield) { player.guard += effect.shield + abilityValue(player, 'shield') + itemValue(player, 'shield'); noteBuff(player); }
     let damage = Number(effect.damage || 0);
     damage += itemValue(player, 'damage') + (player.focusId === target.id ? itemValue(player, 'focusDamage') : 0);
     damage += game.roomState.modifier?.hero?.damage || 0;
@@ -499,6 +516,7 @@ function useCard(game, player, action) {
       const splashDamage = Number(effect.splashDamage ?? (effect.splash ? effect.damage || 1 : 1)) + abilityValue(player, 'splashDamage');
       for (const enemy of enemies) {
         dealDamage(game, player, enemy, splashDamage);
+        if (effect.debuff && enemy.hp > 0) addDebuff(enemy, effect.debuff, 1 + abilityValue(player, 'debuff'), player);
         if (effect.push) pushActor(game, enemy, player, effect.push + abilityValue(player, 'push'));
       }
     }
@@ -657,405 +675,6 @@ function pushActor(game, target, source, count) {
   }
 }
 
-function reactionMove(game, mover, anchor, steps, away = false) {
-  const choices = [];
-  for (let x = 0; x < SIZE; x++) for (let y = 0; y < SIZE; y++) {
-    const length = dist(mover, { x, y });
-    if (!length || length > steps || game.roomState.map.walls.includes(`${x},${y}`)) continue;
-    if (!pathOpen(game.roomState, mover, { x, y }, steps)) continue;
-    if (game.players.some((p) => p.id !== mover.id && living(p) && p.x === x && p.y === y)) continue;
-    if (game.roomState.enemies.some((e) => e.hp > 0 && e.x === x && e.y === y)) continue;
-    choices.push({ x, y });
-  }
-  choices.sort((a, b) => (away ? dist(b, anchor) - dist(a, anchor) : dist(a, anchor) - dist(b, anchor)));
-  if (!choices.length) return false;
-  mover.x = choices[0].x; mover.y = choices[0].y; mover.roomFlags.movedThisRound = true;
-  return true;
-}
-
-function triggerReaction(game, target, attacker, ranged) {
-  const adjacent = dist(target, attacker) <= 1;
-  const triggers = ['self_attacked'];
-  if (adjacent) triggers.push('self_adjacent_attacked');
-  else if (ranged) triggers.push('self_ranged_targeted', 'self_ranged_hit');
-  if (target.hp <= target.maxHp / 2) triggers.push('self_low_hp');
-  const index = target.hand.findIndex((card) => card.outOfTurn && triggers.includes(card.response));
-  if (index >= 0) {
-    const [card] = target.hand.splice(index, 1); target.discard.push(card);
-    if (card.effect.shield) target.guard += card.effect.shield + abilityValue(target, 'shield') + itemValue(target, 'shield');
-    if (card.effect.cancelRanged && ranged) return -1;
-    if (card.effect.evade && ranged) {
-      reactionMove(game, target, attacker, card.effect.move || 1, true);
-      addLog(game, `${target.name} slips out of ${attacker.name}’s attack with ${card.name}.`);
-      return -1;
-    }
-    if (card.effect.move && reactionMove(game, target, attacker, card.effect.move, true) && dist(target, attacker) > (attacker.range || 1)) {
-      addLog(game, `${target.name} blinks clear with ${card.name}.`); return -1;
-    }
-    if (card.effect.taunt) target.buffs.push({ type: 'taunt', range: card.effect.taunt, turns: 1 });
-    if (card.effect.heal) target.hp = Math.min(target.maxHp, target.hp + card.effect.heal + abilityValue(target, 'heal') + (baseClass(target) === 'Weaver' ? 1 : 0));
-    if (card.effect.debuff && attacker.hp > 0) addDebuff(attacker, card.effect.debuff, 1 + abilityValue(target, 'debuff'));
-    if (card.effect.draw) drawCards(target, card.effect.draw);
-    if (card.effect.damage && attacker.hp > 0 && (!card.effect.range || dist(target, attacker) <= card.effect.range)) dealDamage(game, target, attacker, card.effect.damage);
-    if ((card.effect.cancelMelee && adjacent || card.id === 'riposte') && abilityValue(target, 'riposteGuard')) target.guard += abilityValue(target, 'riposteGuard');
-    if (card.effect.cancelMelee && adjacent) { addLog(game, `${target.name} parries ${attacker.name}’s attack with ${card.name}.`); return -1; }
-    addLog(game, `${target.name} reacts with ${card.name}.`);
-  }
-  const allies = eligiblePlayers(game).filter((ally) => ally !== target && dist(ally, target) <= (ranged ? 5 : 1));
-  for (const ally of allies) {
-    const allyAdjacent = dist(ally, target) <= 1;
-    const responseNames = ['ally_attacked', ...(allyAdjacent ? ['ally_adjacent_attacked'] : []), ...(ranged ? ['ally_ranged_hit'] : []), ...(target.hp <= target.maxHp / 2 ? ['ally_low_hp'] : [])];
-    const allyIndex = ally.hand.findIndex((card) => card.outOfTurn && responseNames.includes(card.response));
-    if (allyIndex < 0) continue;
-    const [card] = ally.hand.splice(allyIndex, 1); ally.discard.push(card);
-    if (card.effect.redirect) {
-      if (card.effect.shield) ally.guard += card.effect.shield + abilityValue(ally, 'shield') + itemValue(ally, 'shield');
-      dealDamage(game, attacker, ally, attacker.damage, true);
-      addLog(game, `${ally.name} steps in front of ${target.name} with ${card.name}.`);
-      return -1;
-    }
-    if (card.effect.cancelRanged && ranged) { addLog(game, `${ally.name} turns aside the shot with ${card.name}.`); return -1; }
-    if (card.effect.move) reactionMove(game, ally, target, card.effect.move, false);
-    if (card.effect.shield) target.guard += card.effect.shield + abilityValue(ally, 'shield') + itemValue(ally, 'shield');
-    if (card.effect.taunt) ally.buffs.push({ type: 'taunt', range: card.effect.taunt, turns: 1 });
-    if (card.effect.heal) target.hp = Math.min(target.maxHp, target.hp + card.effect.heal + abilityValue(ally, 'heal') + (baseClass(ally) === 'Weaver' ? 1 : 0));
-    if (card.effect.debuff && attacker.hp > 0) addDebuff(attacker, card.effect.debuff, 1 + abilityValue(ally, 'debuff'));
-    if (card.effect.draw) drawCards(ally, card.effect.draw);
-    if (card.effect.damage && attacker.hp > 0 && (!card.effect.range || dist(ally, attacker) <= card.effect.range)) dealDamage(game, ally, attacker, card.effect.damage);
-    addLog(game, `${ally.name} protects ${target.name} with ${card.name}.`);
-    break;
-  }
-  return 0;
-}
-
-function nearestPlayer(game, enemy) {
-  const alive = eligiblePlayers(game);
-  const taunter = alive.find((player) => player.buffs.some((b) => b.type === 'taunt' && dist(player, enemy) <= b.range));
-  if (taunter) return taunter;
-  return alive.sort((a, b) => dist(a, enemy) - dist(b, enemy))[0] || null;
-}
-
-function enemyPhase(game) {
-  const room = game.roomState;
-  room.round++;
-  room.enemyFavorSpent = false;
-  room.favorHealSpent = false;
-  for (const enemy of room.enemies) {
-    if (enemy.hp <= 0) continue;
-    const rootOwner = eligiblePlayers(game).find((player) => abilityValue(player, 'rootDamage') && enemy.debuffs.some((debuff) => debuff.type === 'root'));
-    if (rootOwner) dealDamage(game, rootOwner, enemy, abilityValue(rootOwner, 'rootDamage'));
-    if (enemy.hp <= 0) continue;
-    let target = nearestPlayer(game, enemy); if (!target) break;
-    const enemyWeak = enemy.debuffs.some((d) => d.type === 'weak');
-    const range = enemy.range || 1;
-    if (dist(enemy, target) > range && !enemy.debuffs.some((d) => d.type === 'root')) {
-      const [x, y] = moveEnemyToward(room, enemy, target, eligiblePlayers(game));
-      if (x !== enemy.x || y !== enemy.y) { enemy.x = x; enemy.y = y; }
-      if (enemy.range === 1 && enemy.x === target.x && enemy.y === target.y) { /* collision avoided by the path helper */ }
-      for (const hero of eligiblePlayers(game)) {
-        if (hero.hand.some((card) => card.outOfTurn && card.response === 'enemy_moves' && dist(hero, enemy) <= (card.effect.range || 1))) {
-          const ix = hero.hand.findIndex((card) => card.outOfTurn && card.response === 'enemy_moves' && dist(hero, enemy) <= (card.effect.range || 1));
-          const [card] = hero.hand.splice(ix, 1); hero.discard.push(card);
-          if (card.effect.damage) dealDamage(game, hero, enemy, card.effect.damage);
-          if (card.effect.debuff) addDebuff(enemy, card.effect.debuff, 1);
-          addLog(game, `${hero.name} springs ${card.name}.`); break;
-        }
-      }
-    }
-    if (dist(enemy, target) > range || enemy.hp <= 0) {
-      for (const d of enemy.debuffs) d.turns--;
-      enemy.debuffs = enemy.debuffs.filter((d) => d.turns > 0);
-      continue;
-    }
-    const guardian = eligiblePlayers(game).find((hero) => hero !== target && baseClass(hero) === 'Knight' && hero.abilities.some((a) => a.id === 'bodyguard') && !hero.roomFlags.bodyguardUsed && dist(hero, target) <= 1 && dist(hero, enemy) <= range);
-    if (guardian) { guardian.roomFlags.bodyguardUsed = true; target = guardian; addLog(game, `${guardian.name} intercepts the first strike with Bodyguard.`); }
-    const response = triggerReaction(game, target, enemy, range > 1);
-    if (response < 0) { addLog(game, `${enemy.name}’s attack is turned aside.`); continue; }
-    if (enemy.hp <= 0) { addLog(game, `${enemy.name} falls before it can strike.`); continue; }
-    let damage = enemy.damage + (room.modifier?.enemy?.damage || 0);
-    const evasion = target.buffs.find((buff) => buff.type === 'evasion');
-    if (evasion) { damage = 0; target.buffs.splice(target.buffs.indexOf(evasion), 1); }
-    if (room.modifier?.rule === 'favor' && !room.enemyFavorSpent) { damage++; room.enemyFavorSpent = true; }
-    if (enemyWeak || enemy.debuffs.some((d) => d.type === 'slow')) damage = Math.max(0, damage - 1);
-    const rootedWard = eligiblePlayers(game).reduce((sum, hero) => sum + abilityValue(hero, 'rootGuard'), 0);
-    if (rootedWard && enemy.debuffs.some((d) => d.type === 'root')) damage = Math.max(0, damage - rootedWard);
-    if (target.buffs.some((b) => b.type === 'taunt')) damage = Math.max(0, damage - abilityValue(target, 'tauntGuard'));
-    const brutesFirst = baseClass(target) === 'Barbarian' || abilityValue(target, 'reduction');
-    if (brutesFirst && !target.roomFlags.reduced) { damage = Math.max(0, damage - 1 - abilityValue(target, 'reduction')); target.roomFlags.reduced = true; }
-    if (baseClass(target) === 'Knight' && target.items.some((item) => item.id === 'tower-shield')) damage = Math.max(0, damage - 1);
-    if (baseClass(target) === 'Wizard' && range > 1 && target.abilities.some((a) => a.id === 'spell-shield') && !target.roomFlags.spellShielded) { damage = Math.max(0, damage - 2); target.roomFlags.spellShielded = true; }
-    if (target.hp <= target.maxHp / 2 && abilityValue(target, 'lowHpGuard') && !target.roomFlags.lowHpGuarded) { target.guard += abilityValue(target, 'lowHpGuard'); target.roomFlags.lowHpGuarded = true; }
-    if (abilityValue(target, 'firstAttackGuard') && !target.roomFlags.firstAttackGuarded) { target.guard += abilityValue(target, 'firstAttackGuard'); target.roomFlags.firstAttackGuarded = true; }
-    const neighboringGuardian = eligiblePlayers(game).find((p) => p !== target && baseClass(p) === 'Knight' && dist(p, target) <= 1 && abilityValue(p, 'allyGuard'));
-    if (neighboringGuardian) { damage = Math.max(0, damage - abilityValue(neighboringGuardian, 'allyGuard')); if (abilityValue(neighboringGuardian, 'allyDraw')) drawCards(neighboringGuardian, abilityValue(neighboringGuardian, 'allyDraw')); }
-    if (abilityValue(target, 'evade') && !target.roomFlags.evaded && (range > 1 || baseClass(target) === 'Wizard')) { damage = 0; target.roomFlags.evaded = true; }
-    if (target.debuffs.some((d) => d.type === 'root') && abilityValue(target, 'cleanse')) target.debuffs = target.debuffs.filter((d) => d.type !== 'root');
-    dealDamage(game, enemy, target, damage, true);
-    if (damage && abilityValue(target, 'thorns') && enemy.hp > 0) dealDamage(game, target, enemy, abilityValue(target, 'thorns'));
-    if (damage && enemy.name === 'Basilisk') addDebuff(target, 'daze', 1);
-    if (damage && enemy.name === 'Cockatrice') addDebuff(target, 'root', 1);
-    if (damage && enemy.name === 'King') addDebuff(target, 'weak', 1);
-    if (damage && enemy.name === 'Guard Dog') addDebuff(target, 'root', 1);
-    if (damage && enemy.name === 'Zombie') addDebuff(target, 'weak', 1);
-    if (damage && ['Horse', 'Beast', 'Gryphon'].includes(enemy.name)) pushActor(game, target, enemy, 1);
-    if (damage && enemy.name === 'Gryphon') {
-      for (const nearby of eligiblePlayers(game).filter((hero) => hero !== target && dist(hero, target) <= 1)) dealDamage(game, enemy, nearby, 1, true);
-    }
-    if (damage) addLog(game, `${enemy.name} hits ${target.name} for ${damage}.`);
-    for (const d of enemy.debuffs) d.turns--;
-    enemy.debuffs = enemy.debuffs.filter((d) => d.turns > 0);
-  }
-  for (const p of eligiblePlayers(game)) {
-    for (const buff of p.buffs) if (buff.turns > 0) buff.turns--;
-    p.buffs = p.buffs.filter((buff) => buff.turns > 0 || buff.type === 'fury' && p.hand.some((c) => c.effect.damage));
-    for (const debuff of p.debuffs) debuff.turns--;
-    p.debuffs = p.debuffs.filter((debuff) => debuff.turns > 0);
-    p.roomFlags.reduced = false; p.roomFlags.evaded = false; p.roomFlags.spellHit = false; p.roomFlags.spellShielded = false; p.roomFlags.doubleTap = false;
-    p.roomFlags.openingStrike = false; p.roomFlags.movedThisRound = false; p.roomFlags.freeSkillSpent = false;
-    p.roomFlags.attackHealed = false; p.roomFlags.hitDrew = false;
-  }
-  if (!alivePlayers(game).length) { game.phase = 'defeat'; addLog(game, 'The whole party has fallen.'); return; }
-  if (room.enemies.every((enemy) => enemy.hp <= 0)) { beginReward(game); return; }
-  for (const player of eligiblePlayers(game)) startTurn(player, room.modifier);
-}
-
-function moveEnemyToward(room, enemy, target, heroes = []) {
-  const options = [[1, 0], [-1, 0], [0, 1], [0, -1]].map(([dx, dy]) => ({ x: enemy.x + dx, y: enemy.y + dy }));
-  const free = options.filter((p) => p.x >= 0 && p.y >= 0 && p.x < SIZE && p.y < SIZE && !room.map.walls.includes(`${p.x},${p.y}`) && !(p.x === target.x && p.y === target.y) && !room.enemies.some((e) => e !== enemy && e.hp > 0 && e.x === p.x && e.y === p.y) && !heroes.some((hero) => hero.id !== target.id && hero.x === p.x && hero.y === p.y));
-  free.sort((a, b) => dist(a, target) - dist(b, target));
-  return free.length ? [free[0].x, free[0].y] : [enemy.x, enemy.y];
-}
-
-function matchingReactionCards(player, prompt, enemy, target, ranged) {
-  let triggers = [];
-  if (prompt === 'enemy_moves') triggers = ['enemy_moves'];
-  else if (player.id === target.id) {
-    triggers = ['self_attacked'];
-    if (dist(player, enemy) <= 1) triggers.push('self_adjacent_attacked');
-    else if (ranged) triggers.push('self_ranged_targeted', 'self_ranged_hit');
-    if (player.hp <= player.maxHp / 2) triggers.push('self_low_hp');
-  } else {
-    triggers = ['ally_attacked'];
-    if (dist(player, target) <= 1) triggers.push('ally_adjacent_attacked');
-    if (ranged) triggers.push('ally_ranged_hit');
-    if (target.hp <= target.maxHp / 2) triggers.push('ally_low_hp');
-  }
-  return player.hand.filter((card) => card.outOfTurn && triggers.includes(card.response));
-}
-
-function openNextReaction(game) {
-  const room = game.roomState, turn = room.enemyTurn;
-  while (turn.reactionIndex < turn.reactionQueue.length) {
-    const responder = turn.reactionQueue[turn.reactionIndex++];
-    const player = actor(game, responder.playerId), enemy = room.enemies.find((item) => item.id === turn.currentEnemyId);
-    const target = game.players.find((item) => item.id === turn.targetId);
-    if (!living(player) || !enemy || enemy.hp <= 0 || !living(target)) continue;
-    const cards = matchingReactionCards(player, responder.trigger, enemy, target, turn.range > 1);
-    if (!cards.length) continue;
-    room.reactionPrompt = {
-      playerId: player.id, enemyId: enemy.id, enemyName: enemy.name, targetId: target.id,
-      targetName: target.name, role: responder.role, trigger: responder.trigger,
-      cardIds: cards.map((card) => card.uid)
-    };
-    addLog(game, `${player.name} has a reaction window: ${responder.trigger === 'enemy_moves' ? `${enemy.name} moved` : `${enemy.name} is attacking ${target.name}`}.`);
-    return true;
-  }
-  room.reactionPrompt = null;
-  turn.stage = turn.afterReactions;
-  return false;
-}
-
-function queueEnemyMoveReactions(game, enemy) {
-  const turn = game.roomState.enemyTurn;
-  const responders = eligiblePlayers(game).filter((player) => matchingReactionCards(player, 'enemy_moves', enemy, player, false).some((card) => dist(player, enemy) <= (card.effect.range || 1)));
-  turn.reactionQueue = responders.map((player) => ({ playerId: player.id, role: 'observer', trigger: 'enemy_moves' }));
-  turn.reactionIndex = 0; turn.afterReactions = 'attack'; turn.stage = 'reactions';
-  openNextReaction(game);
-}
-
-function queueEnemyAttackReactions(game, enemy, target, range) {
-  const turn = game.roomState.enemyTurn;
-  const ranged = range > 1;
-  const allies = eligiblePlayers(game).filter((player) => player !== target && dist(player, target) <= (ranged ? 5 : 1));
-  turn.reactionQueue = [target, ...allies].map((player) => ({ playerId: player.id, role: player.id === target.id ? 'target' : 'ally', trigger: 'attack' }));
-  turn.reactionIndex = 0; turn.afterReactions = 'hit'; turn.stage = 'reactions';
-  openNextReaction(game);
-}
-
-function applyReactionCard(game, player, card, prompt) {
-  const room = game.roomState, turn = room.enemyTurn;
-  const enemy = room.enemies.find((item) => item.id === turn.currentEnemyId);
-  const target = game.players.find((item) => item.id === turn.targetId);
-  if (!enemy || !target || !living(player)) return 'The reaction is no longer available.';
-  const heldIndex = player.hand.findIndex((item) => item.uid === card.uid);
-  if (heldIndex < 0) return 'That reaction card is no longer in your hand.';
-  player.discard.push(...player.hand.splice(heldIndex, 1));
-  const effect = card.effect || {};
-  const shield = Number(effect.shield || 0) + abilityValue(player, 'shield') + itemValue(player, 'shield');
-  const heal = Number(effect.heal || 0) + abilityValue(player, 'heal') + (baseClass(player) === 'Weaver' ? 1 : 0);
-  const enemyMoves = prompt.trigger === 'enemy_moves';
-  const isTarget = prompt.role === 'target';
-  const recipient = isTarget ? target : player;
-
-  if (enemyMoves) {
-    if (effect.damage && dist(player, enemy) <= (effect.range || 1)) dealDamage(game, player, enemy, effect.damage);
-    if (effect.debuff && dist(player, enemy) <= (effect.range || 1)) addDebuff(enemy, effect.debuff, 1 + abilityValue(player, 'debuff'));
-    if (effect.push && dist(player, enemy) <= (effect.range || 1)) pushActor(game, enemy, player, effect.push);
-    addLog(game, `${player.name} springs ${card.name} as ${enemy.name} moves.`);
-    return null;
-  }
-
-  if (effect.redirect && !isTarget) {
-    if (shield) player.guard += shield;
-    const guardBefore = player.guard;
-    dealDamage(game, enemy, player, enemy.damage + (room.modifier?.enemy?.damage || 0), true);
-    const blocked = Math.max(0, guardBefore - player.guard);
-    addLog(game, `${player.name} steps in front of ${target.name} with ${card.name}${blocked ? ` (${blocked} damage caught by guard)` : ''}.`);
-    turn.cancelled = true;
-    return null;
-  }
-  if (effect.shield) recipient.guard += shield;
-  if (effect.heal) recipient.hp = Math.min(recipient.maxHp, recipient.hp + heal);
-  if (effect.taunt) player.buffs.push({ type: 'taunt', range: effect.taunt + abilityValue(player, 'taunt'), turns: 1 + abilityValue(player, 'buffDuration') });
-  if (effect.draw) drawCards(player, effect.draw);
-  if (effect.debuff && enemy.hp > 0 && (isTarget || !effect.range || dist(player, enemy) <= effect.range)) addDebuff(enemy, effect.debuff, 1 + abilityValue(player, 'debuff'));
-  if (effect.damage && enemy.hp > 0 && (!effect.range || dist(player, enemy) <= effect.range)) dealDamage(game, player, enemy, effect.damage);
-  if (effect.push && enemy.hp > 0 && dist(player, enemy) <= (effect.range || 1)) pushActor(game, enemy, player, effect.push);
-
-  if (effect.cancelRanged && turn.range > 1) turn.cancelled = true;
-  if (effect.evade && turn.range > 1) {
-    reactionMove(game, target, enemy, effect.move || 1, true);
-    turn.cancelled = true;
-  } else if (effect.move && isTarget && reactionMove(game, target, enemy, effect.move, true) && dist(target, enemy) > turn.range) turn.cancelled = true;
-  if (effect.move && !isTarget) reactionMove(game, player, target, effect.move, false);
-  if (effect.cancelMelee && dist(target, enemy) <= 1) turn.cancelled = true;
-  if (turn.cancelled) addLog(game, `${player.name} stops ${enemy.name}’s attack with ${card.name}.`);
-  else addLog(game, `${player.name} answers the attack with ${card.name}.`);
-  return null;
-}
-
-function enemyPhase(game) {
-  const room = game.roomState;
-  room.round++;
-  room.enemyFavorSpent = false; room.favorHealSpent = false;
-  room.enemyTurn = { ids: room.enemies.map((enemy) => enemy.id), index: 0, currentEnemyId: null, targetId: null, stage: 'move', reactionQueue: [], reactionIndex: 0, cancelled: false, range: 1 };
-  room.reactionPrompt = null;
-  addLog(game, `Round ${room.round}: the castle company takes its turn.`);
-}
-
-function finishEnemyAction(game, enemy) {
-  if (enemy) {
-    for (const debuff of enemy.debuffs) debuff.turns--;
-    enemy.debuffs = enemy.debuffs.filter((debuff) => debuff.turns > 0);
-  }
-  const turn = game.roomState.enemyTurn;
-  turn.index++; turn.currentEnemyId = null; turn.targetId = null; turn.stage = 'move'; turn.cancelled = false;
-  turn.reactionQueue = []; turn.reactionIndex = 0;
-}
-
-function finishEnemyPhase(game) {
-  const room = game.roomState;
-  room.enemyTurn = null; room.reactionPrompt = null;
-  for (const player of eligiblePlayers(game)) {
-    for (const buff of player.buffs) if (buff.turns > 0) buff.turns--;
-    player.buffs = player.buffs.filter((buff) => buff.turns > 0 || buff.type === 'fury' && player.hand.some((card) => card.effect.damage));
-    for (const debuff of player.debuffs) debuff.turns--;
-    player.debuffs = player.debuffs.filter((debuff) => debuff.turns > 0);
-    player.roomFlags.reduced = false; player.roomFlags.evaded = false; player.roomFlags.spellHit = false; player.roomFlags.spellShielded = false; player.roomFlags.doubleTap = false;
-    player.roomFlags.openingStrike = false; player.roomFlags.movedThisRound = false; player.roomFlags.freeSkillSpent = false;
-    player.roomFlags.attackHealed = false; player.roomFlags.hitDrew = false;
-  }
-  if (!alivePlayers(game).length) { game.phase = 'defeat'; addLog(game, 'The whole party has fallen.'); return; }
-  if (room.enemies.every((enemy) => enemy.hp <= 0)) { beginReward(game); return; }
-  for (const player of eligiblePlayers(game)) startTurn(player, room.modifier);
-  addLog(game, 'The enemy turn ends. Your crew can act again.');
-}
-
-function advanceEnemyPhase(game) {
-  const room = game.roomState, turn = room?.enemyTurn;
-  if (!turn || room.reactionPrompt || game.phase !== 'battle') return;
-  if (turn.stage === 'move') {
-    while (turn.index < turn.ids.length) {
-      const enemy = room.enemies.find((item) => item.id === turn.ids[turn.index]);
-      if (enemy && enemy.hp > 0) break;
-      turn.index++;
-    }
-    if (turn.index >= turn.ids.length) { finishEnemyPhase(game); return; }
-    const enemy = room.enemies.find((item) => item.id === turn.ids[turn.index]);
-    turn.currentEnemyId = enemy.id; turn.cancelled = false;
-    const rootOwner = eligiblePlayers(game).find((player) => abilityValue(player, 'rootDamage') && enemy.debuffs.some((debuff) => debuff.type === 'root'));
-    if (rootOwner) dealDamage(game, rootOwner, enemy, abilityValue(rootOwner, 'rootDamage'));
-    if (enemy.hp <= 0) { addLog(game, `${enemy.name} falls before acting.`); finishEnemyAction(game, enemy); return; }
-    const target = nearestPlayer(game, enemy);
-    if (!target) { finishEnemyAction(game, enemy); return; }
-    turn.targetId = target.id; turn.range = enemy.range || 1;
-    const start = { x: enemy.x, y: enemy.y };
-    if (dist(enemy, target) > turn.range && !enemy.debuffs.some((debuff) => debuff.type === 'root')) {
-      const [x, y] = moveEnemyToward(room, enemy, target, eligiblePlayers(game), turn.range);
-      enemy.x = x; enemy.y = y;
-    }
-    if (enemy.x !== start.x || enemy.y !== start.y) addLog(game, `${enemy.name} advances from ${start.x + 1},${start.y + 1} toward ${target.name} (${enemy.x + 1},${enemy.y + 1}).`);
-    else addLog(game, `${enemy.name} holds position near ${target.name}.`);
-    turn.stage = 'attack';
-    if (enemy.x !== start.x || enemy.y !== start.y) queueEnemyMoveReactions(game, enemy);
-    return;
-  }
-  if (turn.stage === 'attack') {
-    const enemy = room.enemies.find((item) => item.id === turn.currentEnemyId);
-    if (!enemy || enemy.hp <= 0) { finishEnemyAction(game, enemy); return; }
-    let target = game.players.find((item) => item.id === turn.targetId && living(item));
-    if (!target || dist(enemy, target) > turn.range) { target = nearestPlayer(game, enemy); turn.targetId = target?.id || null; }
-    if (!target || dist(enemy, target) > turn.range) {
-      addLog(game, `${enemy.name} cannot reach a hero this turn.`); finishEnemyAction(game, enemy); return;
-    }
-    const guardian = eligiblePlayers(game).find((hero) => hero !== target && baseClass(hero) === 'Knight' && hero.abilities.some((ability) => ability.id === 'bodyguard') && !hero.roomFlags.bodyguardUsed && dist(hero, target) <= 1 && dist(hero, enemy) <= turn.range);
-    if (guardian) { guardian.roomFlags.bodyguardUsed = true; target = guardian; turn.targetId = guardian.id; addLog(game, `${guardian.name} intercepts the strike with Bodyguard.`); }
-    addLog(game, `${enemy.name} prepares to attack ${target.name}.`);
-    queueEnemyAttackReactions(game, enemy, target, turn.range);
-    if (!room.reactionPrompt && turn.stage === 'hit') return;
-    return;
-  }
-  if (turn.stage === 'hit') {
-    const enemy = room.enemies.find((item) => item.id === turn.currentEnemyId);
-    const target = game.players.find((item) => item.id === turn.targetId && living(item));
-    if (!enemy || enemy.hp <= 0) { addLog(game, `${enemy?.name || 'The attacker'} falls before the strike.`); finishEnemyAction(game, enemy); return; }
-    if (turn.cancelled) { addLog(game, `${enemy.name}’s attack is turned aside.`); finishEnemyAction(game, enemy); return; }
-    if (!target || dist(enemy, target) > turn.range) { addLog(game, `${enemy.name} misses after ${target?.name || 'its target'} moves clear.`); finishEnemyAction(game, enemy); return; }
-    const enemyWeak = enemy.debuffs.some((debuff) => debuff.type === 'weak');
-    let damage = enemy.damage + (room.modifier?.enemy?.damage || 0);
-    const evasion = target.buffs.find((buff) => buff.type === 'evasion');
-    if (evasion) { damage = 0; target.buffs.splice(target.buffs.indexOf(evasion), 1); }
-    if (room.modifier?.rule === 'favor' && !room.enemyFavorSpent) { damage++; room.enemyFavorSpent = true; }
-    if (enemyWeak || enemy.debuffs.some((debuff) => debuff.type === 'slow')) damage = Math.max(0, damage - 1);
-    const rootedWard = eligiblePlayers(game).reduce((sum, hero) => sum + abilityValue(hero, 'rootGuard'), 0);
-    if (rootedWard && enemy.debuffs.some((debuff) => debuff.type === 'root')) damage = Math.max(0, damage - rootedWard);
-    if (target.buffs.some((buff) => buff.type === 'taunt')) damage = Math.max(0, damage - abilityValue(target, 'tauntGuard'));
-    const brutesFirst = baseClass(target) === 'Barbarian' || abilityValue(target, 'reduction');
-    if (brutesFirst && !target.roomFlags.reduced) { damage = Math.max(0, damage - 1 - abilityValue(target, 'reduction')); target.roomFlags.reduced = true; }
-    if (baseClass(target) === 'Knight' && target.items.some((item) => item.id === 'tower-shield')) damage = Math.max(0, damage - 1);
-    if (baseClass(target) === 'Wizard' && turn.range > 1 && target.abilities.some((ability) => ability.id === 'spell-shield') && !target.roomFlags.spellShielded) { damage = Math.max(0, damage - 2); target.roomFlags.spellShielded = true; }
-    if (target.hp <= target.maxHp / 2 && abilityValue(target, 'lowHpGuard') && !target.roomFlags.lowHpGuarded) { target.guard += abilityValue(target, 'lowHpGuard'); target.roomFlags.lowHpGuarded = true; }
-    if (abilityValue(target, 'firstAttackGuard') && !target.roomFlags.firstAttackGuarded) { target.guard += abilityValue(target, 'firstAttackGuard'); target.roomFlags.firstAttackGuarded = true; }
-    const neighboringGuardian = eligiblePlayers(game).find((player) => player !== target && baseClass(player) === 'Knight' && dist(player, target) <= 1 && abilityValue(player, 'allyGuard'));
-    if (neighboringGuardian) { damage = Math.max(0, damage - abilityValue(neighboringGuardian, 'allyGuard')); if (abilityValue(neighboringGuardian, 'allyDraw')) drawCards(neighboringGuardian, abilityValue(neighboringGuardian, 'allyDraw')); }
-    if (abilityValue(target, 'evade') && !target.roomFlags.evaded && (turn.range > 1 || baseClass(target) === 'Wizard')) { damage = 0; target.roomFlags.evaded = true; }
-    if (target.debuffs.some((debuff) => debuff.type === 'root') && abilityValue(target, 'cleanse')) target.debuffs = target.debuffs.filter((debuff) => debuff.type !== 'root');
-    const oldHp = target.hp, oldGuard = target.guard;
-    dealDamage(game, enemy, target, damage, true);
-    const hpLost = Math.max(0, oldHp - target.hp), guardUsed = Math.max(0, oldGuard - target.guard);
-    if (hpLost && abilityValue(target, 'thorns') && enemy.hp > 0) dealDamage(game, target, enemy, abilityValue(target, 'thorns'));
-    if (hpLost && enemy.name === 'Basilisk') addDebuff(target, 'daze', 1);
-    if (hpLost && enemy.name === 'Cockatrice') addDebuff(target, 'root', 1);
-    if (hpLost && enemy.name === 'King') addDebuff(target, 'weak', 1);
-    if (hpLost && enemy.name === 'Guard Dog') addDebuff(target, 'root', 1);
-    if (hpLost && enemy.name === 'Zombie') addDebuff(target, 'weak', 1);
-    if (hpLost && ['Horse', 'Beast', 'Gryphon'].includes(enemy.name)) pushActor(game, target, enemy, 1);
-    if (hpLost && enemy.name === 'Gryphon') for (const nearby of eligiblePlayers(game).filter((hero) => hero !== target && dist(hero, target) <= 1)) dealDamage(game, enemy, nearby, 1, true);
-    addLog(game, hpLost ? `${enemy.name} strikes ${target.name} for ${hpLost} HP${guardUsed ? ` (${guardUsed} blocked by guard)` : ''}.` : `${enemy.name} strikes ${target.name}, but guard and defenses stop the blow.`);
-    finishEnemyAction(game, enemy);
-  }
-}
-
 function moveEnemyToward(room, enemy, target, heroes = [], attackRange = 1) {
   const walls = new Set(room.map.walls);
   const blocked = new Set([
@@ -1104,17 +723,17 @@ function drawEnemyCard(enemy) {
 
 function resolveEnemyCard(game, enemy, card) {
   const room = game.roomState;
-  enemy.lastCard = { name: card.name, kind: card.kind };
+  enemy.lastCard = { name: card.name, kind: card.kind, range: card.range || enemy.range || 1 };
   if (card.kind === 'guard') {
     enemy.guard += card.power;
-    addLog(game, `${enemy.name} plays ${card.name} and gains ${card.power} Guard.`, `Enemy deck card. Draw ${enemy.deck.length} · discard ${enemy.discard.length}.`);
+    addLog(game, `${enemy.name} plays ${card.name} and gains ${card.power} Guard.`, `Enemy deck card. Draw ${enemy.deck.length} · discard ${enemy.discard.length}.`, 'enemy');
     return;
   }
   if (card.kind === 'rally') {
     enemy.guard += card.power;
     const ally = room.enemies.filter((foe) => foe !== enemy && foe.hp > 0 && dist(foe, enemy) <= card.range).sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp)[0];
     if (ally) ally.guard += Math.ceil(card.power / 2);
-    addLog(game, `${enemy.name} plays ${card.name}${ally ? `, bolstering ${ally.name}` : ''}.`, `Enemy deck card. Draw ${enemy.deck.length} · discard ${enemy.discard.length}.`);
+    addLog(game, `${enemy.name} plays ${card.name}${ally ? `, bolstering ${ally.name}` : ''}.`, `Enemy deck card. Draw ${enemy.deck.length} · discard ${enemy.discard.length}.`, 'enemy');
     return;
   }
   let target = nearestPlayer(game, enemy, card);
@@ -1125,16 +744,16 @@ function resolveEnemyCard(game, enemy, card) {
     const [x, y] = moveEnemyToward(room, enemy, target, eligiblePlayers(game), attackRange);
     enemy.x = x; enemy.y = y;
   }
-  if (enemy.x !== start.x || enemy.y !== start.y) addLog(game, `${enemy.name} moves toward ${target.name} and takes position at ${enemy.x + 1},${enemy.y + 1}.`, `Intent: ${card.name}. Preferred range: ${attackRange}.`);
+  if (enemy.x !== start.x || enemy.y !== start.y) addLog(game, `${enemy.name} moves toward ${target.name} and takes position at ${enemy.x + 1},${enemy.y + 1}.`, `Intent: ${card.name}. Preferred range: ${attackRange}.`, 'enemy');
   target = nearestPlayer(game, enemy, card) || target;
   if (dist(enemy, target) > attackRange) {
-    addLog(game, `${enemy.name} plays ${card.name}, but no hero is in range.`, `Enemy deck card. Draw ${enemy.deck.length} · discard ${enemy.discard.length}.`);
+    addLog(game, `${enemy.name} plays ${card.name}, but no hero is in range.`, `Enemy deck card. Draw ${enemy.deck.length} · discard ${enemy.discard.length}.`, 'enemy');
     return;
   }
   let damage = card.power + (card.kind === 'aim' ? 1 : 0) + (room.modifier?.enemy?.damage || 0);
   if (enemy.debuffs.some((debuff) => ['weak', 'slow'].includes(debuff.type))) damage = Math.max(0, damage - 1);
   const guardian = eligiblePlayers(game).find((hero) => hero !== target && baseClass(hero) === 'Knight' && hero.abilities.some((ability) => ability.id === 'bodyguard') && !hero.roomFlags.bodyguardUsed && dist(hero, target) <= 1 && dist(hero, enemy) <= attackRange);
-  if (guardian) { guardian.roomFlags.bodyguardUsed = true; target = guardian; addLog(game, `${guardian.name} intercepts the strike with Bodyguard.`); }
+  if (guardian) { guardian.roomFlags.bodyguardUsed = true; target = guardian; addLog(game, `${guardian.name} intercepts the strike with Bodyguard.`, '', 'enemy'); }
   const victims = card.kind === 'sweep' ? [target, ...eligiblePlayers(game).filter((hero) => hero !== target && dist(hero, target) <= 1)] : [target];
   const results = [];
   for (const victim of victims) {
@@ -1152,13 +771,13 @@ function resolveEnemyCard(game, enemy, card) {
     if (hpLost && ['push', 'charge'].includes(card.kind)) pushActor(game, victim, enemy, 1);
     results.push(`${victim.name} ${hpLost} HP${guardLost ? ` (${guardLost} Guard blocked)` : ''}`);
   }
-  addLog(game, `${enemy.name} plays ${card.name}: ${results.join('; ')}.`, `Enemy deck card. ${card.name} · ${card.kind} · power ${card.power} · range ${attackRange}. Draw ${enemy.deck.length} · discard ${enemy.discard.length}.`);
+  addLog(game, `${enemy.name} plays ${card.name}: ${results.join('; ')}.`, `Enemy deck card. ${card.name} · ${card.kind} · power ${card.power} · range ${attackRange}. Draw ${enemy.deck.length} · discard ${enemy.discard.length}.`, 'enemy');
 }
 
 function enemyPhase(game) {
   const room = game.roomState;
   room.round++;
-  addLog(game, `Round ${room.round}: the enemies draw and play.`);
+  addLog(game, `Round ${room.round}: the enemies draw and play.`, 'Enemy phase begins.', 'enemy');
   for (const enemy of room.enemies) {
     if (enemy.hp <= 0) continue;
     if (enemy.debuffs.some((debuff) => debuff.type === 'root')) {
@@ -1182,7 +801,7 @@ function enemyPhase(game) {
     player.roomFlags.openingStrike = false; player.roomFlags.movedThisRound = false; player.roomFlags.freeSkillSpent = false; player.roomFlags.attackHealed = false; player.roomFlags.hitDrew = false;
     startTurn(player, room.modifier);
   }
-  addLog(game, 'The enemies finish their turn. The crew is up again.');
+  addLog(game, 'The enemies finish their turn. The crew is up again.', '', 'enemy');
 }
 
 function randomOffers(player) {
@@ -1246,6 +865,7 @@ function chooseSubclass(game, player, name) {
   for (const card of [...player.draw, ...player.discard, ...player.hand]) {
     if (!card.unique || card.owner !== player.id) continue;
     card.upgraded = true; card.upgradeFocus = damageFocus ? 'damage' : 'utility';
+    card.rarity = 3;
     const preferred = damageFocus ? ['damage', 'debuff', 'shield', 'range'] : ['heal', 'shield', 'draw', 'move', 'debuff', 'range'];
     const effectKey = preferred.find((key) => Number(card.effect[key]) > 0);
     if (effectKey) { card.effect[effectKey] += 1; card.text += ` · Evolved: +1 ${effectKey}`; }
@@ -1357,6 +977,20 @@ function handleAction(game, action) {
       addLog(game, `${player.name} discards ${card.name} instead of playing it.`);
       return null;
     }
+    case 'discardMove': {
+      if (game.phase !== 'battle') return 'You can only discard to move during a fight.';
+      if (player.ended) return 'Your turn is already ended.';
+      if (player.played >= Number(player.playLimit || 2)) return `You have used all ${Number(player.playLimit || 2)} card plays this turn.`;
+      const index = player.hand.findIndex((card) => card.uid === action.cardId);
+      if (index < 0) return 'That card is no longer in your hand.';
+      const card = player.hand[index], rarity = discardMoveReach(player, card), origin = { x: player.x, y: player.y };
+      const movementCard = { category: 'movement', effect: { move: rarity } };
+      const error = movePlayer(game, player, action.x, action.y, movementCard);
+      if (error) return error;
+      player.discard.push(...player.hand.splice(index, 1)); player.played++;
+      addLog(game, `${player.name} discards ${card.name} to move ${dist(origin, player)} tiles (up to ${rarity}).`);
+      return null;
+    }
     case 'end': {
       if (game.phase !== 'battle') return 'There is no active turn.';
       if (player.ended) return 'You already ended this turn.';
@@ -1442,4 +1076,4 @@ function handleAction(game, action) {
   }
 }
 
-module.exports = { createLobby, newPlayer, publicState, handleAction, leavePlayer, connectedCount, safeName, MAX_PLAYERS };
+module.exports = { createLobby, newPlayer, publicState, handleAction, leavePlayer, noteJoin, connectedCount, safeName, MAX_PLAYERS };
