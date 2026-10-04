@@ -3,12 +3,12 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const Engine = require('./server/engine.js');
-const D = require('./public/game-data.js');
 
 const PORT = Number(process.env.PORT || 8787);
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const rooms = new Map();
 const peers = new Set();
+const enemyTimers = new Map();
 const MIME = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.json': 'application/json; charset=utf-8', '.svg': 'image/svg+xml' };
 
 const server = http.createServer((req, res) => {
@@ -51,25 +51,20 @@ function broadcast(game) {
   }
 }
 
+function scheduleEnemyAdvance(game, delay = 700) {
+  if (!game.roomState?.enemyTurn || game.roomState.reactionPrompt || enemyTimers.has(game.code)) return;
+  const timer = setTimeout(() => {
+    enemyTimers.delete(game.code);
+    const current = rooms.get(game.code);
+    if (!current?.roomState?.enemyTurn || current.roomState.reactionPrompt) return;
+    Engine.advanceEnemyPhase(current);
+    broadcast(current);
+    scheduleEnemyAdvance(current);
+  }, delay);
+  enemyTimers.set(game.code, timer);
+}
+
 function roomCode(raw) { return String(raw || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 5); }
-
-function validClass(name, rogueEnabled, partySize) {
-  if (name === 'Random') return true;
-  if (D.CLASS_ORDER.includes(name)) return true;
-  return name === 'Rogue' && !!rogueEnabled && partySize >= 3;
-}
-
-function randomClass(rogueEnabled, partySize, hasRogue) {
-  const pool = [...D.CLASS_ORDER];
-  if (rogueEnabled && partySize >= 3 && !hasRogue) pool.push('Rogue');
-  return pool[Math.floor(Math.random() * pool.length)];
-}
-
-function unusedDisguise(players, requested) {
-  const used = new Set(players.filter((player) => player.className !== 'Rogue').map((player) => player.className));
-  if (requested && D.CLASS_ORDER.includes(requested) && !used.has(requested)) return requested;
-  return D.CLASS_ORDER.find((name) => !used.has(name)) || D.CLASS_ORDER[Math.floor(Math.random() * D.CLASS_ORDER.length)];
-}
 
 function bindPeer(peer, game, playerId) {
   peer.roomCode = game.code; peer.playerId = playerId;
@@ -81,9 +76,7 @@ function receive(peer, raw) {
   try { message = JSON.parse(raw.toString('utf8')); } catch { sendError(peer, 'Could not read that message.'); return; }
   if (message.type === 'create') {
     const playerId = String(message.playerId || crypto.randomUUID()).slice(0, 64);
-    const className = message.className === 'Random' ? randomClass(false, 1, false) : D.CLASS_ORDER.includes(message.className) || message.className === 'Rogue' ? message.className : 'Wizard';
-    if (className === 'Rogue' && !message.rogueEnabled) { sendError(peer, 'Turn on Rogue mode first.'); return; }
-    const game = Engine.createLobby({ hostId: playerId, name: message.name, className, disguiseClass: message.disguiseClass, rogueEnabled: message.rogueEnabled });
+    const game = Engine.createLobby({ hostId: playerId, name: message.name });
     rooms.set(game.code, game); bindPeer(peer, game, playerId); return;
   }
   if (message.type === 'join') {
@@ -94,16 +87,7 @@ function receive(peer, raw) {
     if (existing) { bindPeer(peer, game, playerId); return; }
     if (game.phase !== 'lobby') { sendError(peer, 'That run has already begun; reconnect with the seat you used before.'); return; }
     if (game.players.length >= Engine.MAX_PLAYERS) { sendError(peer, 'This party is full.'); return; }
-    const nextSize = game.players.length + 1;
-    let className = String(message.className || 'Wizard');
-    if (className === 'Random') className = randomClass(game.rogueEnabled, nextSize, game.players.some((player) => player.className === 'Rogue'));
-    if (!validClass(className, game.rogueEnabled, nextSize)) { sendError(peer, 'That class is not available in this lobby.'); return; }
-    const disguiseClass = className === 'Rogue' ? unusedDisguise(game.players, message.disguiseClass) : undefined;
-    if (className === 'Rogue') {
-      if (game.players.some((player) => player.className === 'Rogue')) { sendError(peer, 'This run already has its Rogue.'); return; }
-      if (!disguiseClass) { sendError(peer, 'Choose an unused class for the Rogue to imitate.'); return; }
-    }
-    const player = Engine.newPlayer({ playerId, name: message.name, className, disguiseClass, colorIndex: game.players.length });
+    const player = Engine.newPlayer({ playerId, name: message.name, colorIndex: game.players.length });
     game.players.push(player); bindPeer(peer, game, playerId); return;
   }
   if (!peer.roomCode || !peer.playerId) { sendError(peer, 'Create a game or join a room first.'); return; }
@@ -115,7 +99,9 @@ function receive(peer, raw) {
     const error = Engine.handleAction(game, action);
     if (error) { sendError(peer, error); return; }
     game.lastAction = { kind: action.kind, by: peer.playerId, at: Date.now() };
-    broadcast(game); return;
+    broadcast(game);
+    scheduleEnemyAdvance(game);
+    return;
   }
   sendError(peer, 'That message type is not recognized.');
 }
@@ -173,4 +159,3 @@ setInterval(() => {
 }, 25_000).unref();
 
 server.listen(PORT, '0.0.0.0', () => console.log(`Crownfall is listening on ${PORT}`));
-

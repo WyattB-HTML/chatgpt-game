@@ -29,9 +29,7 @@
       <div class="entry-tabs"><span class="entry-tab active">START A CREW</span><span class="entry-note">OR JOIN ONE BELOW</span></div>
       <label class="field-label" for="player-name">YOUR NAME</label>
       <input id="player-name" class="text-input" maxlength="18" placeholder="What do they call you?" autocomplete="nickname">
-      <div class="field-row"><div class="field-col"><label class="field-label" for="class-select">YOUR CLASS</label><select id="class-select" class="text-input"></select></div>
-      <div id="disguise-wrap" class="field-col hidden"><label class="field-label" for="disguise-select">ROGUE'S GUISE</label><select id="disguise-select" class="text-input"></select></div></div>
-      <div class="rogue-toggle"><label class="toggle"><input id="rogue-enabled" type="checkbox"><span class="toggle-track"></span><span class="toggle-knob"></span></label><div><b>Let a Rogue in</b><small>One player may turn on the crew at the worst moment.</small></div><span class="optional-tag">OPTIONAL · 3+</span></div>
+      <p class="class-deal-note">Classes are dealt at random when the host starts the heist. The host can opt into a hidden Rogue in the lobby.</p>
       <button id="create-room" class="button button-primary button-wide">CREATE A PRIVATE ROOM <span>↗</span></button>
       <div class="join-divider"><span></span><small>ALREADY HAVE A ROOM CODE?</small><span></span></div>
       <div class="join-form"><input id="join-code" class="text-input code-input" maxlength="5" placeholder="ROOM CODE" aria-label="Room code"><button id="join-room" class="button button-quiet">JOIN <span>→</span></button></div>
@@ -55,40 +53,44 @@
     <div id="modifier-banner" class="modifier-banner hidden"></div>
     <div id="lobby-banner" class="lobby-banner hidden"></div>
 
+    <div id="reaction-panel" class="reaction-panel hidden" aria-live="assertive"></div>
+    <nav id="mobile-tabs" class="mobile-tabs" aria-label="Game sections">
+      <button data-mobile-tab="map" class="active">MAP</button><button data-mobile-tab="hand">HAND</button><button data-mobile-tab="party">CREW</button><button data-mobile-tab="foes">FOES</button><button data-mobile-tab="log">LOG</button>
+    </nav>
     <div class="game-columns">
       <section class="play-column">
-        <div class="map-panel panel">
+        <div id="map-panel" class="map-panel panel" data-mobile-pane="map">
           <div class="panel-heading"><div><span class="panel-kicker">TACTICAL VIEW</span><h2 id="map-label">Gatehouse · Fight</h2></div><div class="map-legend"><span><i class="legend-dot ally-dot"></i> CREW</span><span><i class="legend-dot foe-dot"></i> FOE</span><span><i class="legend-dot exit-dot"></i> EXIT</span></div></div>
+          <div id="combat-status" class="combat-status"></div>
           <div id="tile-map" class="tile-map" role="grid" aria-label="Castle tile map"></div>
-          <div class="map-hint" id="map-hint">Choose a card, then click a tile or target.</div>
+          <div class="map-hint" id="map-hint">Choose a card, then click a highlighted tile or target.</div>
         </div>
-        <div class="action-row">
+        <div id="action-row" class="action-row" data-mobile-pane="map">
           <div id="turn-caption" class="turn-caption"><span class="pulse-dot"></span><span>Choose your move</span></div>
           <button id="end-turn" class="button button-primary">END TURN <span>↗</span></button>
           <button id="escape-step" class="button button-primary hidden">MOVE TO GATE <span>↗</span></button>
           <button id="steal-artifact" class="button button-danger hidden">SWIPE THE RELIC <span>↗</span></button>
         </div>
-        <section id="hand-panel" class="hand-panel">
-          <div class="panel-heading hand-heading"><div><span class="panel-kicker">YOUR HAND <span id="hand-count">0 / 3</span></span><h2>Choose your next play</h2></div><div class="hand-rule">PLAY UP TO 2 CARDS · KEEP THE REST</div></div>
+        <section id="hand-panel" class="hand-panel" data-mobile-pane="hand">
+          <div class="panel-heading hand-heading"><div><span class="panel-kicker">YOUR HAND <span id="hand-count">0 / 3</span></span><h2>Choose your next play</h2><div id="deck-count" class="deck-count">Draw 0 · Discard 0</div></div><div id="hand-rule" class="hand-rule">PLAY UP TO 2 CARDS · DISCARD USES A PLAY</div></div>
           <div id="hand-cards" class="hand-cards"></div>
         </section>
-        <section id="reward-panel" class="reward-panel panel hidden"></section>
-        <section id="escape-panel" class="escape-panel panel hidden"></section>
+        <section id="reward-panel" class="reward-panel panel hidden" data-mobile-pane="hand"></section>
+        <section id="escape-panel" class="escape-panel panel hidden" data-mobile-pane="map"></section>
       </section>
 
       <aside class="side-column">
-        <section class="party-panel panel"><div class="panel-heading"><div><span class="panel-kicker">THE CREW</span><h2>Party sheet <span id="party-size" class="count-pill">0</span></h2></div></div><div id="party-list" class="party-list"></div><div id="party-items" class="party-items"></div></section>
-        <section class="foes-panel panel"><div class="panel-heading"><div><span class="panel-kicker">IN THE WAY</span><h2>Castle company</h2></div><span class="foe-count" id="foe-count"></span></div><div id="foe-list" class="foe-list"></div></section>
-        <section class="log-panel panel"><div class="panel-heading"><div><span class="panel-kicker">FIELD NOTES</span><h2>What’s happening</h2></div><span class="live-label"><i></i> LIVE</span></div><div id="event-log" class="event-log"></div></section>
-        <button id="open-rules" class="rules-card"><span class="rules-icon">✦</span><span><b>Need the rules?</b><small>Open the Field Guide</small></span><span class="rules-arrow">↗</span></button>
+        <section id="party-panel" class="party-panel panel" data-mobile-pane="party"><div class="panel-heading"><div><span class="panel-kicker">THE CREW</span><h2>Party sheet <span id="party-size" class="count-pill">0</span></h2></div></div><div id="party-list" class="party-list"></div><div id="party-items" class="party-items"></div></section>
+        <section id="foes-panel" class="foes-panel panel" data-mobile-pane="foes"><div class="panel-heading"><div><span class="panel-kicker">IN THE WAY</span><h2>Castle company</h2></div><span class="foe-count" id="foe-count"></span></div><div id="foe-list" class="foe-list"></div></section>
+        <section id="log-panel" class="log-panel panel" data-mobile-pane="log"><div class="panel-heading"><div><span class="panel-kicker">FIELD NOTES</span><h2>What’s happening</h2></div><span class="live-label"><i></i> LIVE</span></div><div id="event-log" class="event-log"></div></section>
+        <button id="open-rules" class="rules-card" data-mobile-pane="log"><span class="rules-icon">✦</span><span><b>Need the rules?</b><small>Open the Field Guide</small></span><span class="rules-arrow">↗</span></button>
       </aside>
     </div>
   </main>
 
-  <section id="rules" class="rules-drawer hidden" aria-modal="true" role="dialog" aria-labelledby="rules-title"><div class="rules-backdrop" data-close-rules></div><div class="rules-sheet"><button class="close-rules" data-close-rules aria-label="Close rules">×</button><span class="panel-kicker">CROWNFALL · FIELD GUIDE</span><h2 id="rules-title">How to get in<br><span>and get out.</span></h2><div class="rule-copy"><h3>The job</h3><p>Two to six heroes work through 12 rooms across two castle floors. Defeat every foe in a room, share the rewards, beat the King in Room 6 and a vault guardian in Room 12, then reach the red gate with the relic.</p><h3>A round of combat</h3><p>On your turn, draw up to 3 cards. You may play up to 2 cards: move, attack, defend, heal, or use a skill. Unplayed cards stay in your hand. Used cards go to your discard pile; when your draw pile is empty, shuffle your discard pile. Out-of-turn cards trigger automatically when their printed condition occurs. When everyone ends their turn, the castle company moves and attacks.</p><h3>The map &amp; fighting</h3><p>Tap a card, then choose a tile or target on the grid. Distance is counted in horizontal and vertical tiles. Walls block movement unless a card says jump or teleport. Guard absorbs damage before HP. At 0 HP a hero falls; a fallen hero cannot act.</p><h3>Growing stronger</h3><p>After every room, each living hero chooses one of three passive abilities. The crew shares a draft of items: there is one item per two heroes (rounded up). Permanent items stay with their carrier; consumables are spent when used. After Room 6, each hero also chooses one of two subclasses and their unique cards upgrade.</p><h3>Four strange rooms</h3><p>Rooms 3, 6, 9, and 12 reveal one random static effect. Each effect gives the crew a boon with a drawback. Read the banner before choosing your cards.</p><h3>The Rogue (optional)</h3><p>With Rogue mode on, one seat in a crew of 3–6 may choose Rogue and imitate a class no one else uses. Flip any unique card into a Rogue trick. In Room 12, stand beside the living guardian to try to steal the relic. A Rogue carrying it must escape alone to win; otherwise the crew wins by reaching the exit together.</p><h3>Join across devices</h3><p>Create a room and share its five-letter code or invite link. Friends can join from their own phone or computer. The host starts when at least two players are in.</p></div></div></section>
+  <section id="rules" class="rules-drawer hidden" aria-modal="true" role="dialog" aria-labelledby="rules-title"><div class="rules-backdrop" data-close-rules></div><div class="rules-sheet"><button class="close-rules" data-close-rules aria-label="Close rules">×</button><span class="panel-kicker">CROWNFALL · FIELD GUIDE</span><h2 id="rules-title">How to get in<br><span>and get out.</span></h2><div class="rule-copy"><h3>The job</h3><p>Two to six heroes work through 12 rooms across two castle floors. Defeat every foe in a room, share the rewards, beat the King in Room 6 and a vault guardian in Room 12, then reach the red gate with the relic.</p><h3>A round of combat</h3><p>At the start of your turn, draw up to your hand size (3 by default). You may use 2 card plays. Playing or discarding a card uses one play; unplayed cards stay in your hand. A card effect that draws a card also grants one extra play per card drawn this turn. Used cards go to your discard; when the draw pile is empty, the discard pile is shuffled back in. Reaction cards open a pause when their trigger occurs so the named player can play one or pass. Enemy actions resolve one at a time.</p><h3>The map &amp; fighting</h3><p>Tap a card, then choose a highlighted tile or target on the grid. Distance uses the greater of horizontal or vertical steps: a diagonal is 1 tile away. Movement and range count diagonals as one. Walls and other fighters block movement unless a card says jump or teleport. Guard absorbs damage before HP. At 0 HP a hero falls; a fallen hero cannot act.</p><h3>Growing stronger &amp; loot</h3><p>After every room, each living hero chooses one of three passive abilities. Items equal to half the party size, rounded up, are drafted in a rotating order. On your pick, choose an item and assign it to any living hero, or pass. The first picker rotates each room. Permanent items stay with their carrier; consumables are spent when used. After Room 6, each hero also chooses one of two subclasses and their unique cards upgrade.</p><h3>Four strange rooms</h3><p>Rooms 3, 6, 9, and 12 reveal one random static effect. Each effect gives the crew a boon with a drawback. Read the banner before choosing your cards.</p><h3>The Rogue (optional)</h3><p>The host can opt into Rogue mode before starting a party of 3–6. All classes, including a possible Rogue, are dealt randomly at start; no two heroes receive the same class. A Rogue imitates an unused class and can flip unique cards into Rogue tricks. In Room 12, the Rogue may try to steal the relic. A Rogue carrying it must escape alone to win; otherwise the crew wins by reaching the exit together.</p><h3>Join across devices</h3><p>Create a room and share its five-letter code or invite link. Friends can join from their own phone or computer. The host starts when at least two players are in.</p></div></div></section>
   <div id="toast" class="toast" role="status"></div>
   <script src="/game-data.js"></script>
   <script src="/client.js"></script>
 </body>
 </html>
-
