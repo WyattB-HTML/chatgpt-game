@@ -8,7 +8,6 @@ const PORT = Number(process.env.PORT || 8787);
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const rooms = new Map();
 const peers = new Set();
-const enemyTimers = new Map();
 const MIME = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.json': 'application/json; charset=utf-8', '.svg': 'image/svg+xml' };
 
 const server = http.createServer((req, res) => {
@@ -51,19 +50,6 @@ function broadcast(game) {
   }
 }
 
-function scheduleEnemyAdvance(game, delay = 700) {
-  if (!game.roomState?.enemyTurn || game.roomState.reactionPrompt || enemyTimers.has(game.code)) return;
-  const timer = setTimeout(() => {
-    enemyTimers.delete(game.code);
-    const current = rooms.get(game.code);
-    if (!current?.roomState?.enemyTurn || current.roomState.reactionPrompt) return;
-    Engine.advanceEnemyPhase(current);
-    broadcast(current);
-    scheduleEnemyAdvance(current);
-  }, delay);
-  enemyTimers.set(game.code, timer);
-}
-
 function roomCode(raw) { return String(raw || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 5); }
 
 function bindPeer(peer, game, playerId) {
@@ -84,11 +70,23 @@ function receive(peer, raw) {
     if (!game) { sendError(peer, 'No open game has that room code.'); return; }
     const playerId = String(message.playerId || crypto.randomUUID()).slice(0, 64);
     const existing = game.players.find((player) => player.id === playerId);
+    if (existing?.left) { sendError(peer, 'That seat has left the run. A new player can take an open seat before the heist starts.'); return; }
     if (existing) { bindPeer(peer, game, playerId); return; }
     if (game.phase !== 'lobby') { sendError(peer, 'That run has already begun; reconnect with the seat you used before.'); return; }
     if (game.players.length >= Engine.MAX_PLAYERS) { sendError(peer, 'This party is full.'); return; }
     const player = Engine.newPlayer({ playerId, name: message.name, colorIndex: game.players.length });
     game.players.push(player); bindPeer(peer, game, playerId); return;
+  }
+  if (message.type === 'leave') {
+    if (!peer.roomCode || !peer.playerId) return;
+    const code = peer.roomCode, game = rooms.get(code);
+    if (game) {
+      Engine.leavePlayer(game, peer.playerId);
+      peer.roomCode = null; peer.playerId = null;
+      if (game.phase === 'lobby' && game.players.length === 0) rooms.delete(code);
+      else broadcast(game);
+    } else { peer.roomCode = null; peer.playerId = null; }
+    return;
   }
   if (!peer.roomCode || !peer.playerId) { sendError(peer, 'Create a game or join a room first.'); return; }
   const game = rooms.get(peer.roomCode);
@@ -100,7 +98,6 @@ function receive(peer, raw) {
     if (error) { sendError(peer, error); return; }
     game.lastAction = { kind: action.kind, by: peer.playerId, at: Date.now() };
     broadcast(game);
-    scheduleEnemyAdvance(game);
     return;
   }
   sendError(peer, 'That message type is not recognized.');
