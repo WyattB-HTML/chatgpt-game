@@ -1,0 +1,13 @@
+{
+  "name": "crownfall-castle-heist",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A live multiplayer, cooperative dungeon-crawling card RPG",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node server.js"
+  }
+}
+

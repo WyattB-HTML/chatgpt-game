@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: crownfall-castle-heist
+    runtime: node
+    plan: free
+    region: ohio
+    buildCommand: npm install --omit=dev
+    startCommand: npm start
+    healthCheckPath: /
+    autoDeploy: true
+
