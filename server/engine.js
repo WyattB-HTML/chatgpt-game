@@ -20,28 +20,25 @@ function makeMap(roomNo) {
   const layouts = {
     1: ['3,1', '3,2', '5,6', '5,7', '1,5', '2,5', '7,3'], 2: ['3,3', '3,4', '3,5', '5,3', '5,4', '5,5', '7,3'],
     3: ['2,2', '6,2', '2,6', '6,6', '4,4', '7,3'], 4: ['3,2', '3,3', '3,4', '5,4', '5,5', '5,6', '7,3'],
-    5: ['4,2', '3,3', '4,3', '5,3', '4,4', '4,6', '7,3'], 6: ['4,2', '4,3', '4,5', '4,6', '3,4', '5,4', '7,3'],
-    7: ['2,2', '2,3', '2,4', '6,4', '6,5', '6,6', '7,3'], 8: ['3,2', '5,2', '3,3', '5,3', '3,5', '5,5', '7,3'],
-    9: ['2,3', '3,3', '4,3', '5,3', '6,3', '4,6', '7,3'], 10: ['3,2', '5,2', '3,4', '5,4', '3,6', '5,6', '7,3'],
-    11: ['2,2', '4,2', '6,2', '2,6', '4,6', '6,6', '7,3'], 12: ['3,2', '5,2', '3,3', '5,3', '3,5', '5,5', '7,3']
+    5: ['4,2', '3,3', '4,3', '5,3', '4,4', '4,6', '7,3'], 6: ['4,2', '4,3', '4,5', '4,6', '3,4', '5,4', '7,3']
   };
-  const terrainSets = { 2: ['4,2', '4,3', '4,5', '4,6'], 3: ['4,2', '5,2', '4,6', '5,6'], 5: ['3,5', '4,5', '5,5'], 7: ['3,3', '4,3', '5,3'], 8: ['4,4'], 9: ['1,4', '2,4', '3,4', '4,4', '5,4', '6,4'], 10: ['4,2', '4,4', '4,6'], 11: ['3,4', '5,4'], 12: ['4,4'] };
-  const terrainType = ({ 2: 'stall', 3: 'gallery', 5: 'chapel', 7: 'crypt', 8: 'bones', 9: 'water', 10: 'cage', 11: 'rune', 12: 'rune' })[roomNo];
+  const terrainSets = { 2: ['4,2', '4,3', '4,5', '4,6'], 3: ['4,2', '5,2', '4,6', '5,6'], 5: ['3,5', '4,5', '5,5'], 6: ['4,2', '4,4', '4,6'] };
+  const terrainType = ({ 2: 'bone-stalls', 3: 'ossuary', 5: 'desecrated-chapel', 6: 'bone-throne' })[roomNo];
   const terrain = Object.fromEntries((terrainSets[roomNo] || []).map((cell) => [cell, terrainType]));
-  return { size: SIZE, walls: layouts[roomNo] || layouts[1], terrain, type: terrainType || (roomNo === 6 ? 'throne' : roomNo === 1 ? 'gatehouse' : 'stone') };
+  return { size: SIZE, walls: layouts[roomNo] || layouts[1], terrain, type: terrainType || (roomNo === 6 ? 'bone-throne' : roomNo === 1 ? 'cursed-gatehouse' : 'crypt') };
 }
 
 function enemyDeck(name) {
   const profiles = {
-    Guard: [['Spear Thrust','attack',1,1,8],['Brace','guard',2,0,4],['Shield Jab','push',1,1,3]], Soldier: [['Sword Cut','attack',2,1,7],['Rally','guard',2,0,3],['Driving Blow','push',2,1,5]],
-    Archer: [['Longshot','attack',2,4,8],['Steady Aim','aim',1,4,3],['Pinning Arrow','root',1,3,4]], Horse: [['Charge','charge',3,1,6],['Hoof Kick','push',3,1,5],['Trample','sweep',2,1,4]],
-    'Guard Dog': [['Bite','root',1,1,7],['Pounce','charge',2,1,5],['Snarl','weaken',1,2,3]], Monster: [['Crushing Blow','attack',3,1,7],['Ground Slam','sweep',2,1,5],['Thick Hide','guard',3,0,3]],
-    Skeleton: [['Bone Shot','attack',2,3,7],['Rattle','weaken',1,2,4],['Bone Guard','guard',2,0,4]], Zombie: [['Rotting Bite','weaken',2,1,7],['Grab','root',2,1,4],['Staggering March','charge',2,1,4]],
-    Beast: [['Pounce','charge',3,1,6],['Raking Claw','sweep',2,1,5],['Predator Stare','mark',1,3,4]], King: [['Royal Cleave','sweep',4,1,6],['Command the Guard','rally',2,4,4],['Sovereign Strike','attack',4,2,5]],
-    Basilisk: [['Petrifying Gaze','daze',3,4,6],['Stone Tail','sweep',3,1,5],['Scale Guard','guard',3,0,4]], Cockatrice: [['Stone Feather','root',2,4,6],['Raking Beak','attack',3,1,5],['Wings of Dust','charge',3,2,4]], Gryphon: [['Diving Rake','charge',4,1,6],['Wing Sweep','sweep',3,1,5],['High Guard','guard',3,0,4]]
+    'Skeletal Guard': [['Bone Spear','attack',1,1,8],['Brace','guard',2,0,4],['Shield Jab','push',1,1,3]],
+    'Skeletal Soldier': [['Graveblade Cut','attack',2,1,7],['Raise the Dead','rally',2,4,3],['Driving Blow','push',2,1,5]],
+    'Bone Archer': [['Gravebolt','attack',2,4,8],['Steady Aim','aim',1,4,3],['Pinning Bone','root',1,3,4]],
+    'Skeletal Horse': [['Bone Charge','charge',3,1,6],['Hoof Kick','push',3,1,5],['Trample','sweep',2,1,4]],
+    'Zombie Hound': [['Rotting Bite','root',1,1,7],['Grave Pounce','charge',2,1,5],['Death Rattle','weaken',1,2,3]],
+    'Giant Skeleton King': [['Royal Cleave','sweep',4,1,6],['Command the Dead','rally',2,4,4],['Sovereign Strike','attack',4,2,5]]
   };
   const cards = [];
-  for (const [cardName, kind, power, range, copies] of profiles[name] || profiles.Guard) for (let i=0;i<copies;i++) cards.push({ name: cardName, kind, power, range });
+  for (const [cardName, kind, power, range, copies] of profiles[name] || profiles['Skeletal Guard']) for (let i=0;i<copies;i++) cards.push({ name: cardName, kind, power, range });
   while (cards.length < 15) cards.push({ ...cards[0] });
   return shuffle(cards.slice(0, 15));
 }
@@ -63,58 +60,52 @@ function makeCard(template, unique, owner) {
   return {
     uid: id('c'), id: template.id, name: template.name, category: template.category,
     text: template.text, effect: { ...(template.effect || {}) },
-    unique, owner, upgraded: false, rarity: unique ? 2 : 1
+    unique, owner, rarity: unique ? 2 : 1
   };
 }
 
 function newPlayer({ playerId, name, colorIndex }) {
   const stats = D.CLASSES.Wizard;
   return {
-    id: playerId, name: safeName(name, `Adventurer ${colorIndex + 1}`), className: null, disguiseClass: null,
-    subclass: null, level: 1, hp: stats.hp, maxHp: stats.hp, x: [[1, 1], [2, 1], [1, 2], [2, 2], [1, 3], [2, 3]][colorIndex % 6][0], y: [[1, 1], [2, 1], [1, 2], [2, 2], [1, 3], [2, 3]][colorIndex % 6][1],
+    id: playerId, name: safeName(name, `Adventurer ${colorIndex + 1}`), className: null,
+    level: 1, hp: stats.hp, maxHp: stats.hp, x: [[1, 1], [2, 1], [1, 2], [2, 2], [1, 3], [2, 3]][colorIndex % 6][0], y: [[1, 1], [2, 1], [1, 2], [2, 2], [1, 3], [2, 3]][colorIndex % 6][1],
     dead: false, guard: 0, hand: [], draw: [], discard: [], abilities: [],
     items: [], buffs: [], debuffs: [], stats: { damageDealt: 0, damageTaken: 0, damageHealed: 0, buffsGiven: 0, debuffsGiven: 0 }, ended: false, played: 0, playLimit: 2, nextPlayBonus: 0, categoriesPlayed: [],
-    focusId: null, roomFlags: {}, runFlags: {}, colorIndex, rogueStolen: false, artifact: false
+    focusId: null, roomFlags: {}, runFlags: {}, colorIndex
   };
 }
 
-function enemyTemplate(name, floor, boss = false, partySize = 2, roomNo = floor) {
-  const bossStats = {
-    King: [21 + partySize * 4, 4, 1], Basilisk: [24 + partySize * 4, 4, 3],
-    Cockatrice: [20 + partySize * 4, 3, 3], Gryphon: [23 + partySize * 4, 4, 2]
-  };
-  const stats = bossStats[name] || ({
-    Guard: [4 + floor, 1 + (floor === 2 ? 1 : 0), 1], Soldier: [6 + floor, 2, 1], Archer: [4 + floor, 2, 4],
-    Horse: [7 + floor, 3, 1], 'Guard Dog': [3 + floor, 1, 1], Monster: [7 + floor * 2, 3, 1],
-    Skeleton: [5 + floor, 2, 3], Zombie: [8 + floor, 2, 1], Beast: [7 + floor, 3, 1]
-  }[name] || [5 + floor, 2, 1]);
+function enemyTemplate(name, boss = false, partySize = 2, roomNo = 1) {
+  const stats = ({
+    'Giant Skeleton King': [29, 4, 2], 'Skeletal Guard': [5, 1, 1], 'Skeletal Soldier': [7, 2, 1],
+    'Bone Archer': [5, 2, 4], 'Skeletal Horse': [8, 3, 1], 'Zombie Hound': [4, 1, 1]
+  }[name] || [5, 1, 1]);
   const abilities = {
-    King: 'Royal cleave: adjacent targets take 4; challengers are weakened.', Basilisk: 'Petrifying stare: ranged attack; hit targets are dazed.',
-    Cockatrice: 'Stone-feather volley: shoots the farthest hero and roots them.', Gryphon: 'Raking dive: leaps beside a hero and sweeps nearby tiles.',
-    Archer: 'Prefers long range; shoots for 2.', Horse: 'Charges in a straight line and shoves its target.',
-    'Guard Dog': 'Fast; bites for 1 and roots the target.', Skeleton: 'Ranged bone shot; deals 2.', Zombie: 'Slow; bites for 2 and weakens.',
-    Beast: 'Pounces for 3 and pushes its target.', Monster: 'Heavy blow for 3; splash hits nearby heroes.'
+    'Giant Skeleton King': 'Royal Cleave sweeps adjacent heroes; Command the Dead bolsters the King and a nearby undead ally; Sovereign Strike deals 4 damage at range 2.',
+    'Skeletal Guard': 'Bone Spear attacks at range 1; Brace adds 2 Guard; Shield Jab pushes a hero.',
+    'Skeletal Soldier': 'Graveblade Cut deals 2 at range 1; Raise the Dead grants Guard to itself and an undead ally; Driving Blow pushes a hero.',
+    'Bone Archer': 'Gravebolt attacks at range 4; Steady Aim strengthens its next attack; Pinning Bone roots its target.',
+    'Skeletal Horse': 'Bone Charge closes distance and pushes; Hoof Kick pushes; Trample sweeps adjacent heroes.',
+    'Zombie Hound': 'Rotting Bite roots; Grave Pounce closes distance and pushes; Death Rattle weakens its target.'
   };
   const scale = 1 + Math.max(0, partySize - 2) * 0.08 + Math.max(0, roomNo - 1) * 0.025;
-  const hp = Math.ceil(stats[0] * scale), damage = stats[1] + Math.floor(Math.max(0, partySize - 2) / 3) + (floor === 2 ? 1 : 0);
+  const hp = Math.ceil(stats[0] * scale), damage = stats[1] + Math.floor(Math.max(0, partySize - 2) / 3);
   return { id: id('e'), name, hp, maxHp: hp, damage, range: stats[2], boss, x: 7, y: 7, guard: 0, debuffs: [], ability: abilities[name] || `Attacks for ${damage} damage.`, deck: enemyDeck(name), discard: [], lastCard: null };
 }
 
-function createRoom(roomNo, players, previousModifier = null) {
-  const floor = roomNo <= 6 ? 1 : 2;
+function createRoom(roomNo, players) {
   const map = makeMap(roomNo);
   const allNames = D.ENEMY_NAMES[roomNo];
   let names;
   let bossName = null;
-  if (roomNo === 6) { bossName = 'King'; names = ['King', 'Guard', 'Archer']; }
-  else if (roomNo === 12) { bossName = ['Basilisk', 'Cockatrice', 'Gryphon'][Math.floor(Math.random() * 3)]; names = [bossName, 'Skeleton', 'Beast']; }
+  if (roomNo === 6) { bossName = 'Giant Skeleton King'; names = [bossName, 'Skeletal Guard', 'Bone Archer']; }
   else {
-    const size = Math.min(5, 2 + Math.floor(players.length / 2) + (floor === 2 ? 1 : 0));
+    const size = Math.min(5, 2 + Math.floor(players.length / 2));
     names = Array.from({ length: size }, (_, index) => allNames[(index + roomNo) % allNames.length]);
   }
   const positions = [[7, 7], [7, 1], [4, 7], [6, 4], [2, 7]];
-  const enemies = names.map((name, index) => ({ ...enemyTemplate(name, floor, name === bossName, players.length, roomNo), x: positions[index][0], y: positions[index][1] }));
-  const mod = [3, 6, 9, 12].includes(roomNo) ? D.clone(D.MODIFIERS[Math.floor(Math.random() * D.MODIFIERS.length)]) : null;
+  const enemies = names.map((name, index) => ({ ...enemyTemplate(name, name === bossName, players.length, roomNo), x: positions[index][0], y: positions[index][1] }));
+  const mod = [3, 6].includes(roomNo) ? D.clone(D.MODIFIERS[Math.floor(Math.random() * D.MODIFIERS.length)]) : null;
   for (const p of players) {
     const spawn = [[1, 1], [2, 1], [1, 2], [2, 2], [1, 3], [2, 3]][p.colorIndex % 6]; p.x = spawn[0]; p.y = spawn[1];
     p.ended = false; p.played = 0; p.categoriesPlayed = []; p.roomFlags = {}; p.guard = 0;
@@ -129,11 +120,11 @@ function createRoom(roomNo, players, previousModifier = null) {
     if (enemies.some((enemy) => enemy.boss) && abilityValue(p, 'bossDraw')) { drawCards(p, abilityValue(p, 'bossDraw')); p.runFlags.bossSeen = true; }
   }
   const turnLog = [{ id: 1, text: `Room ${roomNo}: ${roomLabel(roomNo)}.`, detail: `Room type: ${map.type}. Enemies draw and play one card from their own 15-card deck each round.` }, ...(mod ? [{ id: 2, text: `Static effect: ${mod.name}.`, detail: `${mod.buff} ${mod.debuff}` }] : [])];
-  return { room: roomNo, floor, map, enemies, modifier: mod, round: 1, startedAt: Date.now(), durationRecorded: false, artifact: roomNo === 12 ? 'sealed' : null, exit: { x: 0, y: 4 }, bossName, logSequence: turnLog.length, turnLog };
+  return { room: roomNo, floor: 1, map, enemies, modifier: mod, round: 1, startedAt: Date.now(), durationRecorded: false, bossName, logSequence: turnLog.length, turnLog };
 }
 
 function roomLabel(roomNo) {
-  const names = ['Gatehouse', 'Stable Court', 'Moon Gallery', 'Barracks', 'Old Chapel', 'Throne Hall', 'Crypt Stair', 'Bone Gallery', 'Flooded Cellar', 'Beast Pens', 'Hall of Echoes', 'Basilisk Vault'];
+  const names = ['Cursed Gatehouse', 'Rotting Stables', 'Moonless Gallery', 'Crypt Barracks', 'Desecrated Chapel', 'Bone Throne'];
   return names[roomNo - 1] || `Room ${roomNo}`;
 }
 
@@ -159,7 +150,7 @@ function createLobby({ hostId, name }) {
   const code = crypto.randomBytes(3).toString('hex').slice(0, 5).toUpperCase();
   const player = newPlayer({ playerId: hostId, name, colorIndex: 0 });
   return {
-    code, hostId, createdAt: Date.now(), startedAt: null, roomDurations: [], phase: 'lobby', players: [player], rogueEnabled: false,
+    code, hostId, createdAt: Date.now(), startedAt: null, roomDurations: [], phase: 'lobby', players: [player],
     roomState: null, reward: null, winner: null, lastAction: null, chat: [], lobbyLog: [{ text: `${player.name} opened the room.` }]
   };
 }
@@ -176,25 +167,17 @@ function noteJoin(game, playerId, rejoined = false) {
   }
 }
 
-function dealClasses(game, rogueEnabled) {
-  const wantsRogue = !!rogueEnabled && game.players.length >= 3;
-  const pool = shuffle([...D.CLASS_ORDER, ...(wantsRogue ? ['Rogue'] : [])]);
-  const assignments = pool.slice(0, game.players.length);
-  const usedCore = new Set(assignments.filter((name) => name !== 'Rogue'));
-  const disguises = shuffle(D.CLASS_ORDER.filter((name) => !usedCore.has(name)));
+function dealClasses(game) {
+  const assignments = shuffle([...D.CLASS_ORDER]).slice(0, game.players.length);
   for (let i = 0; i < game.players.length; i++) {
     const player = game.players[i];
     const assigned = assignments[i];
-    const disguiseClass = assigned === 'Rogue' ? disguises.pop() : null;
-    const actualClass = disguiseClass || assigned;
-    const stats = D.CLASSES[actualClass] || D.CLASSES.Wizard;
+    const stats = D.CLASSES[assigned] || D.CLASSES.Wizard;
     player.className = assigned;
-    player.disguiseClass = disguiseClass;
     player.hp = stats.hp; player.maxHp = stats.hp;
-    player.draw = baseDeck(actualClass, player.id);
+    player.draw = baseDeck(assigned, player.id);
     player.hand = []; player.discard = [];
   }
-  game.rogueEnabled = wantsRogue;
   game.startedAt = Date.now(); game.roomDurations = [];
 }
 
@@ -207,13 +190,6 @@ function publicState(game, viewerId = null) {
     delete enemy.deck; delete enemy.discard;
   }
   for (const player of state.players) {
-    if (player.className === 'Rogue' && player.id !== viewerId) {
-      player.className = player.disguiseClass || 'Wizard';
-      player.disguiseClass = null;
-      player.subclass = null;
-      player.abilities = [];
-      player.rogueStolen = false;
-    }
     if (player.id !== viewerId) {
       player.handCount = player.hand.length;
       player.drawCount = player.draw.length;
@@ -223,7 +199,7 @@ function publicState(game, viewerId = null) {
   }
   if (state.reward?.choices) {
     for (const [playerId, choice] of Object.entries(state.reward.choices)) {
-      if (playerId !== viewerId) { delete choice.abilityOptions; delete choice.subclassOptions; }
+      if (playerId !== viewerId) delete choice.abilityOptions;
     }
   }
   return state;
@@ -245,11 +221,7 @@ function leavePlayer(game, playerId) {
   }
   if (game.phase === 'victory' || game.phase === 'defeat') return null;
   player.dead = true; player.left = true; player.ended = true; player.hp = 0;
-  if (player.artifact) {
-    player.artifact = false; player.rogueStolen = false;
-    if (game.roomState) game.roomState.artifact = 'sealed';
-    addLog(game, `${player.name} leaves the crew; the relic falls back into the vault.`);
-  } else if (game.roomState) addLog(game, `${player.name} leaves the crew.`);
+  if (game.roomState) addLog(game, `${player.name} leaves the crew.`);
   if (game.reward) {
     delete game.reward.choices[playerId];
     const removedAt = game.reward.draftOrder.indexOf(playerId);
@@ -268,8 +240,6 @@ function leavePlayer(game, playerId) {
     if (!eligiblePlayers(game).length) {
       game.phase = 'defeat'; recordRoomDuration(game); addLog(game, 'The whole party has left the keep.');
     } else if (eligiblePlayers(game).every((member) => member.ended)) enemyPhase(game);
-  } else if (game.phase === 'escape' && !eligiblePlayers(game).length) {
-    game.phase = 'defeat'; recordRoomDuration(game); addLog(game, 'The whole party has left the keep.');
   }
   return null;
 }
@@ -313,8 +283,7 @@ function abilityValue(player, effect) {
 }
 
 function itemValue(player, key) { return player.items.reduce((sum, item) => sum + Number(item[key] || 0), 0); }
-function isRogue(player) { return player.className === 'Rogue'; }
-function baseClass(player) { return player.disguiseClass || player.className; }
+function baseClass(player) { return player.className; }
 
 function movePlayer(game, player, x, y, card = null) {
   if (game.phase === 'battle' && player.debuffs.some((d) => d.type === 'root') && !abilityValue(player, 'cleanse')) return 'You are rooted and cannot move this round.';
@@ -325,12 +294,11 @@ function movePlayer(game, player, x, y, card = null) {
   if (baseClass(player) === 'Ranger' && player.played === 0) max += 1;
   if (game.roomState.modifier?.rule === 'rough_move' && card?.category === 'movement') max = Math.max(1, max - 1);
   if (card?.effect?.move && card.effect.target === 'ally') max = Number(card.effect.move) + 1;
-  const teleport = !!card?.effect?.teleport || !!card?.effect?.jump || (card?.id === 'rogue-shadowstep');
   if (!Number.isInteger(x) || !Number.isInteger(y) || x < 0 || x >= SIZE || y < 0 || y >= SIZE || distTiles > max || distTiles === 0) return 'That tile is outside this movement card’s reach.';
   if (room.map.walls.includes(`${x},${y}`)) return 'That tile is blocked by rubble.';
   if (room.enemies.some((e) => e.hp > 0 && e.x === x && e.y === y) || game.players.some((p) => p.id !== player.id && living(p) && p.x === x && p.y === y)) return 'Someone is standing there.';
   const occupied = [...room.enemies.filter((e) => e.hp > 0), ...game.players.filter((p) => p.id !== player.id && living(p))].map((actor) => `${actor.x},${actor.y}`);
-  if (!teleport && !pathOpen(room, { x: player.x, y: player.y }, { x, y }, max, occupied)) return 'A wall or another fighter blocks that path.';
+  if (!pathOpen(room, { x: player.x, y: player.y }, { x, y }, max, occupied)) return 'A wall or another fighter blocks that path.';
   player.x = x; player.y = y;
   if (freeMove) player.buffs.splice(player.buffs.indexOf(freeMove), 1);
   player.roomFlags.movedThisRound = true;
@@ -338,7 +306,7 @@ function movePlayer(game, player, x, y, card = null) {
 }
 
 function discardMoveReach(player, card) {
-  return card.upgraded ? 3 : Number(card.rarity || (card.unique ? 2 : 1));
+  return Number(card.rarity || (card.unique ? 2 : 1));
 }
 
 function pathOpen(room, from, to, maxSteps, occupied = []) {
@@ -375,26 +343,7 @@ function chargeTile(game, player, target, range, baseMove) {
 
 function findCard(player, cardUid) { return player.hand.find((card) => card.uid === cardUid); }
 
-function rogueVersion(card) {
-  const variants = {
-    attack: { id: 'rogue-backstab', name: 'Backstab', text: 'Deal 2 damage. Rogues may target a player.', effect: { damage: 2, range: 1, target: 'any' } },
-    defense: { id: 'rogue-fade', name: 'Fade Away', text: 'Gain 2 guard and become hard to target.', effect: { shield: 2, buff: 'evasion' } },
-    skill: { id: 'rogue-lift-purse', name: 'Lift Purse', text: 'Steal a consumable from an adjacent player or draw a card.', effect: { stealItem: true, range: 1, draw: 1, target: 'any' } }
-  };
-  return variants[card.category] || variants.skill;
-}
-
-function effectiveCard(player, card, flipped) {
-  if (flipped && isRogue(player) && card.unique) {
-    const variant = rogueVersion(card);
-    const effect = { ...variant.effect };
-    if (card.upgraded) {
-      const preferred = card.upgradeFocus === 'damage' ? ['damage', 'shield', 'range'] : ['heal', 'shield', 'move', 'draw', 'range'];
-      const key = preferred.find((name) => Number(effect[name]) > 0);
-      if (key) effect[key]++;
-    }
-    return { ...card, ...variant, effect, flipped: true };
-  }
+function effectiveCard(card) {
   return { ...card, effect: { ...card.effect } };
 }
 
@@ -415,7 +364,7 @@ function useCard(game, player, action) {
   if (player.ended) return 'Your turn is already ended.';
   const original = findCard(player, action.cardId);
   if (!original) return 'That card is no longer in your hand.';
-  const card = effectiveCard(player, original, !!action.flipped);
+  const card = effectiveCard(original);
   if (cardCategoryBlocked(game, player, card)) return `The room effect blocks a second ${card.category} card this turn.`;
   const freeAttack = card.category === 'attack' && abilityValue(player, 'freeAttack') && !player.roomFlags.freeAttackSpent;
   const freeSkill = card.category === 'skill' && abilityValue(player, 'freeSkill') && !player.roomFlags.freeSkillSpent;
@@ -434,11 +383,7 @@ function useCard(game, player, action) {
     if (effect.shield) movedActor.guard += effect.shield + abilityValue(player, 'shield');
   } else if (effect.damage || card.category === 'attack') {
     let target;
-    const wantsPlayer = effect.target === 'any' && action.targetKind === 'player';
-    if (wantsPlayer) {
-      if (!isRogue(player)) return 'Only the Rogue may target an ally.';
-      target = targetByAction(game, action, 'player');
-    } else target = targetByAction(game, action, 'enemy');
+    target = targetByAction(game, action, 'enemy');
     if (!target) return 'Choose a living target.';
     const range = (effect.range || 1) + abilityValue(player, 'range') + itemValue(player, 'range') + (baseClass(player) === 'Ranger' ? 1 : 0) + (baseClass(player) === 'Wizard' && card.unique ? 1 : 0) + (game.roomState.modifier?.hero?.range || 0);
     const hasAbility = (abilityId) => player.abilities.some((ability) => ability.id === abilityId);
@@ -520,10 +465,6 @@ function useCard(game, player, action) {
       }
     }
     if (effect.lifesteal) healPlayer(game, player, player, effect.lifesteal + abilityValue(player, 'lifesteal'));
-  } else if (effect.stealItem && isRogue(player) && action.targetKind === 'player') {
-    const ally = targetByAction(game, action, 'player');
-    if (!ally || ally.id === player.id || dist(player, ally) > (effect.range || 1)) return 'Choose an adjacent player.';
-    applySkill(game, player, card, ally, null);
   } else {
     if (effect.target === 'ally' || effect.heal || (effect.move && effect.target === 'ally')) {
       const ally = action.targetId ? targetByAction(game, action, 'player') : player;
@@ -548,9 +489,8 @@ function useCard(game, player, action) {
   if (!player.categoriesPlayed.includes(card.category)) player.categoriesPlayed.push(card.category);
   if (baseClass(player) === 'Wizard' && card.category === 'skill' && abilityValue(player, 'skillGuard')) player.guard += abilityValue(player, 'skillGuard');
   if (baseClass(player) === 'Swordsman' && card.category === 'attack' && player.focusId === action.targetId && abilityValue(player, 'focus')) addLog(game, 'Duelist focus: the follow-up hit cuts deeper.');
-  const cardLabel = card.flipped ? `${original.name} → ${card.name}` : card.name;
   const target = game.players.find((entry) => entry.id === action.targetId) || game.roomState.enemies.find((entry) => entry.id === action.targetId);
-  addLog(game, `${player.name} played ${cardLabel}.`, `${card.text} ${target ? `Target: ${target.name}.` : ''}`.trim());
+  addLog(game, `${player.name} played ${card.name}.`, `${card.text} ${target ? `Target: ${target.name}.` : ''}`.trim());
   return null;
 }
 
@@ -575,10 +515,6 @@ function applySkill(game, player, card, ally, enemy) {
   if (e.cleanse && ally) ally.debuffs.splice(0, Math.max(1, e.cleanse + abilityValue(player, 'cleanse')));
   if (e.draw) drawCards(player, e.draw);
   if (e.move && ally && e.target === 'ally') { ally.buffs.push({ type: 'freeMove', value: e.move, turns: 1 }); noteBuff(player); }
-  if (e.stealItem && isRogue(player) && ally && ally !== player && dist(player, ally) <= (e.range || 1)) {
-    const ix = ally.items.findIndex((item) => item.kind === 'consumable');
-    if (ix >= 0) player.items.push(...ally.items.splice(ix, 1));
-  }
   if (e.damage && enemy) dealDamage(game, player, enemy, e.damage + itemValue(player, 'damage'));
 }
 
@@ -639,10 +575,6 @@ function dealDamage(game, source, target, amount, isHeroTarget = false) {
       const reviver = game.players.find((player) => abilityValue(player, 'revive') && !player.runFlags.revived);
       if (reviver) { target.dead = false; target.ended = false; target.hp = abilityValue(reviver, 'revive'); reviver.runFlags.revived = true; addLog(game, `${reviver.name} brings ${target.name} back into the fight.`); }
     }
-    if (target.dead && target.artifact) {
-      target.artifact = false; target.rogueStolen = false; game.roomState.artifact = 'sealed';
-      addLog(game, `${target.name} falls. The relic is recovered by the crew.`);
-    }
   }
   if (!isHeroTarget && target.hp <= 0) {
     addLog(game, `${target.name} falls.`);
@@ -661,7 +593,6 @@ function onKill(game, player, target) {
     if (open) movePlayer(game, player, open.x, open.y, { effect: { move: 1 } });
   }
   if (baseClass(player) === 'Barbarian' && player.items.some((i) => i.id === 'red-belt')) healPlayer(game, player, player, 1);
-  if (player.className === 'Rogue' && target.id === player.focusId) addLog(game, 'The Rogue leaves no witness.');
 }
 
 function pushActor(game, target, source, count) {
@@ -706,10 +637,10 @@ function nearestPlayer(game, enemy, card = null) {
   if (taunts.length) return taunts.sort((a, b) => dist(a, enemy) - dist(b, enemy))[0];
   return alive.map((player) => {
     const distance = dist(player, enemy), hpRatio = player.hp / Math.max(1, player.maxHp);
-    const carrying = player.artifact ? -5 : 0, fragile = ['Wizard', 'Ranger', 'Weaver'].includes(baseClass(player)) ? -0.4 : 0;
+    const fragile = ['Wizard', 'Ranger', 'Weaver'].includes(baseClass(player)) ? -0.4 : 0;
     const alreadyRooted = card?.kind === 'root' && player.debuffs.some((debuff) => debuff.type === 'root') ? 1 : 0;
     const bossThreat = enemy.boss ? Math.min(Number(player.stats?.damageDealt || 0), 80) * 0.012 : 0;
-    return { player, score: distance * 1.3 + hpRatio * 2.2 + Math.min(player.guard, 8) * 0.08 + carrying + fragile + alreadyRooted - bossThreat };
+    return { player, score: distance * 1.3 + hpRatio * 2.2 + Math.min(player.guard, 8) * 0.08 + fragile + alreadyRooted - bossThreat };
   }).sort((a, b) => a.score - b.score)[0]?.player || null;
 }
 
@@ -804,16 +735,16 @@ function enemyPhase(game) {
 }
 
 function randomOffers(player) {
-  const subclass = D.getAbilityList(baseClass(player), player.subclass);
+  const options = D.getAbilityList(baseClass(player));
   const owned = new Set(player.abilities.map((a) => a.id));
-  const pool = subclass.filter(([name]) => !owned.has(name.toLowerCase().replace(/[^a-z0-9]+/g, '-')));
-  return shuffle(pool.length >= 3 ? pool : subclass).slice(0, 3).map(([name, text, effect, value]) => ({
+  const pool = options.filter(([name]) => !owned.has(name.toLowerCase().replace(/[^a-z0-9]+/g, '-')));
+  return shuffle(pool.length >= 3 ? pool : options).slice(0, 3).map(([name, text, effect, value]) => ({
     id: name.toLowerCase().replace(/[^a-z0-9]+/g, '-'), name, text, effect, value
   }));
 }
 
 function beginReward(game) {
-  if (game.roomState.room < 12) recordRoomDuration(game);
+  recordRoomDuration(game);
   game.phase = 'reward';
   for (const player of eligiblePlayers(game)) {
     if (abilityValue(player, 'roomDraw')) drawCards(player, abilityValue(player, 'roomDraw'));
@@ -826,7 +757,7 @@ function beginReward(game) {
   const livingParty = eligiblePlayers(game);
   for (const player of livingParty) {
     player.level++;
-    choices[player.id] = { abilityOptions: randomOffers(player), abilityChosen: false, subclassOptions: game.roomState.room === 6 && !player.subclass ? D.SUBCLASSES[player.className] || D.SUBCLASSES[baseClass(player)] : null, ready: false };
+    choices[player.id] = { abilityOptions: randomOffers(player), abilityChosen: false, ready: false };
   }
   const rotate = livingParty.length ? (game.roomState.room - 1) % livingParty.length : 0;
   const draftOrder = [...livingParty.slice(rotate), ...livingParty.slice(0, rotate)].map((player) => player.id);
@@ -856,24 +787,6 @@ function lootDraftComplete(game) {
   return !game.reward || game.reward.items.every((item) => !!item.claimedBy);
 }
 
-function chooseSubclass(game, player, name) {
-  const options = D.SUBCLASSES[player.className] || D.SUBCLASSES[baseClass(player)];
-  if (!options?.includes(name)) return 'That subclass is not available.';
-  player.subclass = name;
-  const damageFocus = ['Archmage', 'Hexweaver', 'Reaver', 'Deadeye', 'Bounty Hunter', 'Justiciar', 'Assassin'].includes(name);
-  for (const card of [...player.draw, ...player.discard, ...player.hand]) {
-    if (!card.unique || card.owner !== player.id) continue;
-    card.upgraded = true; card.upgradeFocus = damageFocus ? 'damage' : 'utility';
-    card.rarity = 3;
-    const preferred = damageFocus ? ['damage', 'debuff', 'shield', 'range'] : ['heal', 'shield', 'draw', 'move', 'debuff', 'range'];
-    const effectKey = preferred.find((key) => Number(card.effect[key]) > 0);
-    if (effectKey) { card.effect[effectKey] += 1; card.text += ` · Evolved: +1 ${effectKey}`; }
-    else if (card.effect.range) card.effect.range += 1;
-    card.name = `${card.name} +`;
-  }
-  return null;
-}
-
 function grantItem(player, itemData) {
   const effect = itemData.effect || {};
   const classBonus = itemData.classBonus?.[player.className] || itemData.classBonus?.[baseClass(player)] || 0;
@@ -899,37 +812,12 @@ function continueAfterReward(game) {
   if (game.reward.items.some((item) => !item.claimedBy)) return 'Finish the party loot draft before leaving.';
   const roomNo = game.roomState.room;
   game.reward = null;
-  if (roomNo < 12) {
+  if (roomNo < 6) {
     game.roomState = createRoom(roomNo + 1, eligiblePlayers(game)); game.phase = 'battle';
   } else {
-    game.phase = 'escape'; game.roomState.turnLog = ['The basilisk vault is clear. Reach the marked gate with the artifact.'];
-    game.roomState.enemies = [];
-    if (isRogue(eligiblePlayers(game)[0]) && eligiblePlayers(game).length === 1) { eligiblePlayers(game)[0].artifact = true; game.roomState.artifact = 'rogue'; }
+    game.phase = 'victory'; game.winner = 'Party';
+    addLog(game, 'The Giant Skeleton King falls. The curse breaks across the keep.');
   }
-  return null;
-}
-
-function escape(game, player) {
-  if (game.phase !== 'escape') return 'The exit is not open yet.';
-  if (player.dead) return 'A fallen hero cannot escape.';
-  const exit = game.roomState.exit;
-  if (player.x !== exit.x || player.y !== exit.y) return 'Move onto the red gate tile first.';
-  player.escaped = true;
-  if (player.artifact && isRogue(player)) {
-    game.phase = 'victory'; game.winner = 'Rogue'; recordRoomDuration(game); addLog(game, `${player.name} slips away with the artifact.`); return null;
-  }
-  const partyEscaped = eligiblePlayers(game).some((p) => p.escaped && !p.artifact);
-  if (partyEscaped && game.roomState.artifact !== 'rogue') { game.phase = 'victory'; game.winner = 'Party'; recordRoomDuration(game); addLog(game, 'The party escapes with the artifact.'); }
-  return null;
-}
-
-function stealArtifact(game, player) {
-  if (!isRogue(player) || game.roomState.room !== 12 || game.phase !== 'battle' || game.roomState.artifact !== 'sealed') return 'The artifact is not available to steal.';
-  const boss = game.roomState.enemies.find((e) => e.boss && e.hp > 0);
-  if (!boss || dist(player, boss) > 1) return 'Stand beside the living vault guardian to attempt the theft.';
-  const chance = player.subclass === 'Thief' || player.items.some((i) => i.id === 'fox-coin') ? 0.67 : 0.4;
-  if (Math.random() < chance) { player.artifact = true; player.rogueStolen = true; game.roomState.artifact = 'rogue'; addLog(game, `${player.name} steals the artifact during the fight!`); }
-  else addLog(game, `${player.name} reaches for the artifact and is spotted!`);
   return null;
 }
 
@@ -959,10 +847,9 @@ function handleAction(game, action) {
     case 'start': {
       if (game.phase !== 'lobby') return 'This run has already started.';
       if (game.players.length < 2 || game.players.length > MAX_PLAYERS) return 'A run needs 2–6 players.';
-      if (action.rogueEnabled && game.players.length < 3) return 'Rogue mode requires at least three players.';
-      dealClasses(game, !!action.rogueEnabled);
+      dealClasses(game);
       game.roomState = createRoom(1, eligiblePlayers(game)); game.phase = 'battle'; game.reward = null;
-      addLog(game, `The host deals distinct classes${game.rogueEnabled ? ', with a Rogue in the mix' : ''}.`);
+      addLog(game, 'The host deals six distinct classes at random. The crew enters the cursed keep.');
       return null;
     }
     case 'play': if (game.phase !== 'battle') return 'Cards can only be played during a fight.'; return useCard(game, player, action);
@@ -1016,12 +903,6 @@ function handleAction(game, action) {
       if (selected.effect === 'maxHp') { player.maxHp += selected.value; player.hp += selected.value; }
       choice.abilityChosen = true; return null;
     }
-    case 'chooseSubclass': {
-      if (game.phase !== 'reward') return 'Subclasses are chosen after clearing Room 6.';
-      const choice = game.reward.choices[player.id]; if (!choice?.subclassOptions?.includes(action.subclass)) return 'That subclass is not one of your choices.';
-      const error = chooseSubclass(game, player, action.subclass); if (error) return error;
-      choice.subclassOptions = null; choice.abilityOptions = randomOffers(player); return null;
-    }
     case 'claimItem': {
       if (game.phase !== 'reward') return 'There is no reward to claim.';
       const drafterId = currentDrafter(game);
@@ -1054,25 +935,15 @@ function handleAction(game, action) {
     case 'readyReward': {
       if (game.phase !== 'reward') return 'There is no reward to ready for.';
       const choice = game.reward.choices[player.id]; if (!choice?.abilityChosen) return 'Choose an ability first.';
-      if (choice.subclassOptions?.length) return 'Choose a subclass first.';
       if (!lootDraftComplete(game)) return 'Wait for the party loot draft to finish.';
       choice.ready = true;
       if (lootDraftComplete(game) && Object.values(game.reward.choices).every((c) => c.abilityChosen && c.ready)) continueAfterReward(game);
       return null;
     }
-    case 'consume': if (!['battle', 'escape'].includes(game.phase)) return 'Items can’t be used right now.'; return useItem(game, player, action.itemId, action.targetId);
-    case 'escapeStep': {
-      if (game.phase !== 'escape') return 'You can move freely once the gate is open.';
-      if (player.dead || player.escaped) return 'You cannot move from this place.';
-      const err = movePlayer(game, player, action.x, action.y, { effect: { move: 1 } });
-      if (err) return err;
-      if (player.x === game.roomState.exit.x && player.y === game.roomState.exit.y) player.escaped = false;
-      return null;
-    }
-    case 'steal': return stealArtifact(game, player);
-    case 'escape': return escape(game, player);
+    case 'consume': if (game.phase !== 'battle') return 'Items can’t be used right now.'; return useItem(game, player, action.itemId, action.targetId);
     default: return 'That action is not recognized.';
   }
 }
 
 module.exports = { createLobby, newPlayer, publicState, handleAction, leavePlayer, noteJoin, connectedCount, safeName, MAX_PLAYERS };
+
