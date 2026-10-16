@@ -2,6 +2,8 @@
 
 Crownfall is a cross-device cooperative deck RPG for 2–6 players. The crew fights through six rooms of a necrotic keep and defeats the Giant Skeleton King in the Bone Throne.
 
+Play online: [Crownfall — The Cursed Keep](https://crownfall-castle-heist.onrender.com/).
+
 ## Run locally
 
 Requires Node.js 20 or newer. The app uses only Node's built-in modules.
