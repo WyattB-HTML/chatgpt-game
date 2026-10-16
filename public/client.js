@@ -1,16 +1,16 @@
 (() => {
   const D = window.CrownfallData;
   const $ = (selector) => document.querySelector(selector);
-  const state = { socket: null, game: null, playerId: localStorage.getItem('crownfall-player') || crypto.randomUUID(), roomCode: localStorage.getItem('crownfall-room') || '', selectedCard: null, discardMoveCardId: null, flipped: false, stepMode: false, mobileTab: 'map', handView: 'hand', guideRoom: '', guideOpen: false, guideIndex: 0, rogueAtStart: false, connected: false, toastTimer: null, enemyAlerts: [], enemyRoomKey: null, lastEnemyLogId: 0 };
+  const state = { socket: null, game: null, playerId: localStorage.getItem('crownfall-player') || crypto.randomUUID(), roomCode: localStorage.getItem('crownfall-room') || '', selectedCard: null, discardMoveCardId: null, stepMode: false, mobileTab: 'map', handView: 'hand', guideRoom: '', guideOpen: false, guideIndex: 0, connected: false, toastTimer: null, enemyAlerts: [], enemyRoomKey: null, lastEnemyLogId: 0 };
   const GUIDE_SLIDES = [
     ['Your hand', 'At the start of your turn, draw up to 3 cards. You get 2 card plays. Unused cards stay in your hand for the next turn. Press 1–9 to select a card.'],
-    ['Play or discard', 'Play a card for its effect, or discard it to move. The dots show the number of tiles that card moves: 1 for basic, 2 for class cards, 3 for evolved cards.'],
+    ['Play or discard', 'Play a card for its effect, or discard it to move. The dots show the number of tiles that card moves: 1 for basic cards and 2 for class cards.'],
     ['Read the card', 'The highlighted stat badges show damage, Guard, healing, movement, and range. Select a card, then click a highlighted tile or foe. Diagonals count as 1 tile.'],
     ['Work as a crew', 'Guard absorbs damage before HP. Heal or protect allies, coordinate in the Chat tab, and take turns drafting room rewards. Press E to end your turn.'],
-    ['Get the relic out', 'Clear 12 rooms across two floors, defeat the King and the vault guardian, then reach the red gate together. Good luck.']
+    ['Break the curse', 'Fight through six rooms of the cursed keep. Reach the bone throne and defeat the Giant Skeleton King together. Good luck.']
   ];
-  const icons = { Wizard: '✧', Weaver: '❋', Barbarian: '⚒', Ranger: '➶', Swordsman: '⚔', Knight: '⬟', Rogue: '♠', Guard: '♟', Soldier: '⚔', Archer: '➶', Horse: '♞', 'Guard Dog': '♣', Monster: '♧', Skeleton: '☠', Zombie: '♨', Beast: '♢', King: '♛', Basilisk: '◈', Cockatrice: '☗', Gryphon: '♜' };
-  const names = ['The Gatehouse', 'Stable Court', 'Moon Gallery', 'Barracks', 'Old Chapel', 'Throne Hall', 'Crypt Stair', 'Bone Gallery', 'Flooded Cellar', 'Beast Pens', 'Hall of Echoes', 'Basilisk Vault'];
+  const icons = { Wizard: '✧', Weaver: '❋', Barbarian: '⚒', Ranger: '➶', Swordsman: '⚔', Knight: '⬟', 'Skeletal Guard': '☠', 'Skeletal Soldier': '⚔', 'Bone Archer': '➶', 'Skeletal Horse': '♞', 'Zombie Hound': '♨', 'Giant Skeleton King': '♛' };
+  const names = ['Cursed Gatehouse', 'Rotting Stables', 'Moonless Gallery', 'Crypt Barracks', 'Desecrated Chapel', 'Bone Throne'];
 
   function escapeHtml(value) { return String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]); }
   function myPlayer() { return state.game?.players.find((player) => player.id === state.playerId); }
@@ -72,7 +72,6 @@
   async function createRoom() {
     const name = $('#player-name').value.trim();
     localStorage.setItem('crownfall-name', name);
-    state.rogueAtStart = false;
     state.playerId = crypto.randomUUID(); localStorage.setItem('crownfall-player', state.playerId);
     await send('create', { playerId: state.playerId, name });
   }
@@ -99,8 +98,8 @@
     const isLobby = game.phase === 'lobby';
     $('#room-code').textContent = game.code;
     $('#game-title').textContent = room ? names[room.room - 1] : 'Gather the crew';
-    $('#floor-name').textContent = room ? `FLOOR ${room.floor === 1 ? 'I' : 'II'}` : 'THE KEEP';
-    $('#room-count').textContent = room ? `ROOM ${String(room.room).padStart(2, '0')} / 12` : `${game.players.length} / 6 SEATS`;
+    $('#floor-name').textContent = 'THE CURSED KEEP';
+    $('#room-count').textContent = room ? `ROOM ${String(room.room).padStart(2, '0')} / 6` : `${game.players.length} / 6 SEATS`;
     $('#party-size').textContent = game.players.length;
     renderProgress(room?.room || 0);
     renderLobby(isLobby, game, me);
@@ -113,11 +112,10 @@
     renderModifier(room);
     renderHand(game, me);
     renderReward(game, me);
-    renderEscape(game, me);
     renderActions(game, me);
     renderScoreboard(game);
     applyMobileLayout(game, me);
-    $('#map-label').textContent = room ? `${names[room.room - 1]} · ${game.phase === 'escape' ? 'Escape' : game.phase === 'reward' ? 'Rewards' : room.bossName ? 'Boss Fight' : 'Encounter'}` : 'Invite your crew · classes dealt at start';
+    $('#map-label').textContent = room ? `${names[room.room - 1]} · ${game.phase === 'reward' ? 'Rewards' : game.phase === 'victory' ? 'The curse is broken' : room.bossName ? 'Boss Fight' : 'Encounter'}` : 'Invite your crew · classes dealt at start';
     $('#game-view').dataset.roomType = room?.map?.type || 'lobby';
     $('#game-view').dataset.room = room?.room || 0;
     if (game.phase === 'victory' || game.phase === 'defeat') showEndScreen(game);
@@ -142,33 +140,20 @@
   }
 
   function renderProgress(roomNo) {
-    $('#progress-rail').innerHTML = Array.from({ length: 12 }, (_, i) => `<span class="progress-room ${i + 1 < roomNo ? 'done' : ''} ${i + 1 === roomNo ? 'current' : ''}" title="Room ${i + 1}"></span>`).join('');
+    $('#progress-rail').innerHTML = Array.from({ length: 6 }, (_, i) => `<span class="progress-room ${i + 1 < roomNo ? 'done' : ''} ${i + 1 === roomNo ? 'current' : ''}" title="Room ${i + 1}"></span>`).join('');
   }
 
   function renderLobby(show, game, me) {
     const banner = $('#lobby-banner'); banner.classList.toggle('hidden', !show);
-    $('#end-turn').classList.add('hidden'); $('#steal-artifact').classList.add('hidden'); $('#escape-step').classList.add('hidden');
+    $('#end-turn').classList.add('hidden');
     $('#hand-panel').classList.toggle('hidden', show || game.phase !== 'battle');
     if (!show) return;
     const seats = game.players.length;
     const isHost = game.hostId === state.playerId;
-    if (seats < 3) state.rogueAtStart = false;
-    const rogueToggle = isHost ? `<label class="rogue-toggle"><span class="toggle"><input id="rogue-at-start" type="checkbox" ${state.rogueAtStart ? 'checked' : ''} ${seats < 3 ? 'disabled' : ''}><span class="toggle-track"></span><span class="toggle-knob"></span></span><span><b>Include a possible Rogue</b><small>${seats < 3 ? 'Available with 3 or more players.' : 'If dealt, the Rogue imitates an unused class.'}</small></span><span class="optional-tag">OPTIONAL · 3+</span></label>` : '';
-    banner.innerHTML = `<strong>Room ${escapeHtml(game.code)}</strong> · Invite friends with the code or <button class="inline-link" id="share-lobby">copy invite link</button>. ${seats < 2 ? 'A second player is needed before the host can start.' : `${seats} players are ready.`} Classes are dealt randomly with no duplicates. ${isHost ? (state.rogueAtStart ? 'A Rogue may be dealt.' : 'Rogue mode is off.') : ''}${rogueToggle}<div class="host-controls">${isHost ? `<button class="button button-primary" id="start-run" ${seats < 2 ? 'disabled' : ''}>START THE HEIST <span>↗</span></button><span class="host-note">Your class is revealed when the run begins.</span>` : `<span class="host-note">Waiting for ${escapeHtml(game.players.find((p) => p.id === game.hostId)?.name || 'the host')} to begin.</span>`}</div>`;
-    $('#start-run')?.addEventListener('click', () => act('start', { rogueEnabled: state.rogueAtStart }));
-    $('#rogue-at-start')?.addEventListener('change', (event) => { state.rogueAtStart = event.target.checked; render(); });
+    banner.innerHTML = `<strong>Room ${escapeHtml(game.code)}</strong> · Invite friends with the code or <button class="inline-link" id="share-lobby">copy invite link</button>. ${seats < 2 ? 'A second player is needed before the host can start.' : `${seats} players are ready.`} Classes are dealt randomly with no duplicates. <div class="host-controls">${isHost ? `<button class="button button-primary" id="start-run" ${seats < 2 ? 'disabled' : ''}>ENTER THE KEEP <span>↗</span></button><span class="host-note">Your class is revealed when the run begins.</span>` : `<span class="host-note">Waiting for ${escapeHtml(game.players.find((p) => p.id === game.hostId)?.name || 'the host')} to begin.</span>`}</div>`;
+    $('#start-run')?.addEventListener('click', () => act('start'));
     $('#share-lobby')?.addEventListener('click', copyInvite);
     $('.turn-caption span:last-child').textContent = game.players.length >= 2 ? 'The host can begin when ready.' : 'Waiting for another player to join.';
-  }
-
-  function visualEffect(card, me) {
-    if (state.flipped && me?.className === 'Rogue' && card?.unique) {
-      return ({
-        attack: { damage: 2, range: 1, target: 'any' }, defense: { shield: 2, buff: 'evasion' },
-        skill: { stealItem: true, range: 1, draw: 1, target: 'any' }
-      })[card.category] || card.effect;
-    }
-    return card?.effect || {};
   }
 
   function statBonus(me, name) {
@@ -212,36 +197,35 @@
     const room = game.roomState;
     if (!room) { $('#tile-map').innerHTML = ''; $('#map-hint').textContent = 'Your crew will appear here when the host starts.'; $('#combat-status').textContent = ''; return; }
     const walls = new Set(room.map.walls), card = me?.hand.find((held) => held.uid === state.selectedCard);
-    const effect = visualEffect(card, me);
+    const effect = card?.effect || {};
     const discardMoveCard = me?.hand.find((held) => held.uid === state.discardMoveCardId);
     const selectedMove = !!discardMoveCard;
     const playerClass = combatClass(me);
     const moveBonus = me ? statBonus(me, 'move') + (me.buffs.find((buff) => buff.type === 'freeMove')?.value || 0) + (playerClass === 'Ranger' && me.played === 0 ? 1 : 0) : 0;
-    const discardRarity = discardMoveCard ? (discardMoveCard.upgraded ? 3 : Number(discardMoveCard.rarity || (discardMoveCard.unique ? 2 : 1))) : 0;
+    const discardRarity = discardMoveCard ? Number(discardMoveCard.rarity || (discardMoveCard.unique ? 2 : 1)) : 0;
     let maxMove = selectedMove ? (discardMoveCard ? discardRarity : Number(effect.move || 0)) + moveBonus : 0;
     if (room.modifier?.rule === 'rough_move' && selectedMove) maxMove = Math.max(1, maxMove - 1);
-    const moveTiles = selectedMove && me ? movementReach(room, me, maxMove, !!(effect.teleport || effect.jump || card?.id === 'rogue-shadowstep')) : new Set();
+    const moveTiles = selectedMove && me ? movementReach(room, me, maxMove) : new Set();
     const isAttack = !!card && (card.category === 'attack' || !!effect.damage);
     const wizardSpellRange = isAttack && playerClass === 'Wizard' && card.unique ? 1 : 0;
     const targetRange = card ? Number(effect.range || (effect.debuff || effect.taunt || effect.target === 'enemy' ? 4 : effect.heal || effect.target === 'ally' ? 99 : 1)) + (isAttack ? statBonus(me, 'range') + (playerClass === 'Ranger' ? 1 : 0) + wizardSpellRange + Number(room.modifier?.hero?.range || 0) : abilityBonus(me, 'range')) : 0;
     const targetsEnemy = !!card && (card.category === 'attack' || effect.damage || effect.debuff || effect.taunt || effect.target === 'enemy');
-    const targetsAlly = !!card && !targetsEnemy && (effect.heal || effect.target === 'ally' || effect.stealItem);
-    const isMovingNow = !!state.stepMode || game.phase === 'escape';
+    const targetsAlly = !!card && !targetsEnemy && (effect.heal || effect.target === 'ally');
+    const isMovingNow = !!state.stepMode;
     const stepTiles = isMovingNow && me ? movementReach(room, me, state.stepMode ? 1 : 1) : new Set();
     const moveSet = selectedMove ? moveTiles : stepTiles;
     let hint = discardMoveCard ? `Discard ${discardMoveCard.name} to move up to ${maxMove} tiles. Choose a green tile.` : selectedMove ? `Green tiles: move up to ${maxMove} tile${maxMove === 1 ? '' : 's'}; diagonals count as 1.` : state.stepMode ? 'Choose an open tile within 1 step (diagonals count).' : targetsEnemy || targetsAlly ? `Select a highlighted target within ${targetRange} tile${targetRange === 1 ? '' : 's'}; diagonals count as 1.` : 'Choose a card, then click a highlighted tile or target.';
-    if (game.phase === 'escape') hint = 'Use Move to walk toward the red gate. Diagonals count as 1 tile.';
     $('#map-hint').textContent = hint;
     const guard = me?.guard ?? 0;
     const movementText = selectedMove ? `MOVE · UP TO ${maxMove}` : `MOVE · DISCARD A CARD${moveBonus ? ` · BONUS +${moveBonus}` : ''}`;
     const rangeText = targetRange >= 99 ? 'RANGE · ALL TILES' : `RANGE · ${targetRange} TILES`;
-    const classLabel = me?.className === 'Rogue' ? `ROGUE · ${me.disguiseClass || 'DISGUISE'}` : me?.subclass ? `${me.className} · ${me.subclass}` : me?.className;
+    const classLabel = me?.className;
     const classChip = me?.className ? `<span class="status-chip class-chip">CLASS · ${escapeHtml(classLabel)}</span>` : '';
     const hpChip = me ? `<span class="status-chip hp-chip">HP <b>${me.hp}/${me.maxHp}</b></span>` : '';
     $('#combat-status').innerHTML = `${classChip}${hpChip}<span class="status-chip guard-chip">GUARD <b>${guard}</b></span><span class="status-chip">${movementText}</span>${targetsEnemy || targetsAlly ? `<span class="status-chip range-chip">${rangeText}</span>` : ''}${me ? `<span class="status-chip deck-chip">DRAW ${me.draw.length} · DISCARD ${me.discard.length}</span>` : ''}`;
     const map = [];
     for (let y = 0; y < room.map.size; y++) for (let x = 0; x < room.map.size; x++) {
-      const key = `${x},${y}`, wall = walls.has(key), isExit = game.phase === 'escape' && x === room.exit.x && y === room.exit.y;
+      const key = `${x},${y}`, wall = walls.has(key);
       const player = game.players.find((p) => !p.dead && p.x === x && p.y === y);
       const enemy = room.enemies.find((e) => e.hp > 0 && e.x === x && e.y === y);
       const actor = player || enemy;
@@ -255,8 +239,8 @@
       const isMove = !wall && moveSet.has(key) && !actor;
       const inRangeZone = !!card && (targetsEnemy || targetsAlly) && !wall && !actor && inRange(me, { x, y }, targetRange);
       const terrain = room.map.terrain?.[key];
-      const classes = [wall ? 'wall' : '', isExit ? 'is-exit' : '', isMove ? 'is-move-range' : '', inRangeZone ? 'is-range-zone' : '', targetEnemy ? 'is-target' : '', targetAlly ? 'is-ally-target' : '', terrain ? `terrain-${terrain}` : ''].filter(Boolean).join(' ');
-      map.push(`<button class="tile ${classes}" role="gridcell" data-x="${x}" data-y="${y}" ${wall ? 'disabled' : ''} aria-label="${player ? `${escapeHtml(player.name)}, ${player.hp} HP, ${player.guard || 0} Guard` : enemy ? `${escapeHtml(enemy.name)}, ${enemy.hp} HP, ${enemy.guard || 0} Guard` : `${x + 1}, ${y + 1}${isMove ? ', reachable' : ''}${terrain ? `, ${terrain}` : ''}`}">${token}${wall && !actor ? '<span class="wall-glyph">▰</span>' : ''}${isExit && !actor ? '<span class="token-emoji exit-glyph">⌑</span>' : ''}</button>`);
+      const classes = [wall ? 'wall' : '', isMove ? 'is-move-range' : '', inRangeZone ? 'is-range-zone' : '', targetEnemy ? 'is-target' : '', targetAlly ? 'is-ally-target' : '', terrain ? `terrain-${terrain}` : ''].filter(Boolean).join(' ');
+      map.push(`<button class="tile ${classes}" role="gridcell" data-x="${x}" data-y="${y}" ${wall ? 'disabled' : ''} aria-label="${player ? `${escapeHtml(player.name)}, ${player.hp} HP, ${player.guard || 0} Guard` : enemy ? `${escapeHtml(enemy.name)}, ${enemy.hp} HP, ${enemy.guard || 0} Guard` : `${x + 1}, ${y + 1}${isMove ? ', reachable' : ''}${terrain ? `, ${terrain}` : ''}`}">${token}${wall && !actor ? '<span class="wall-glyph">▰</span>' : ''}</button>`);
     }
     $('#tile-map').innerHTML = map.join('');
     $('#tile-map').dataset.roomType = room.map.type || 'stone';
@@ -267,20 +251,17 @@
     const room = game.roomState;
     const targetPlayer = game.players.find((p) => !p.dead && p.x === x && p.y === y);
     const targetEnemy = room.enemies.find((e) => e.hp > 0 && e.x === x && e.y === y);
-    if (game.phase === 'escape' && state.stepMode) { act('escapeStep', { x, y }); state.stepMode = false; return; }
     if (state.discardMoveCardId) { act('discardMove', { cardId: state.discardMoveCardId, x, y }); state.discardMoveCardId = null; return; }
     const card = me?.hand.find((held) => held.uid === state.selectedCard);
     if (!card) { if (targetEnemy) showToast(`${targetEnemy.name}: ${targetEnemy.hp}/${targetEnemy.maxHp} HP. ${targetEnemy.ability}`); return; }
     if (card.category === 'attack' || card.effect.damage || card.effect.debuff || card.effect.taunt) {
-      const mayHitFriend = me.className === 'Rogue' && state.flipped;
-      if (targetEnemy) act('play', { cardId: card.uid, targetId: targetEnemy.id, targetKind: 'enemy', flipped: state.flipped });
-      else if (targetPlayer && mayHitFriend && targetPlayer.id !== me.id) act('play', { cardId: card.uid, targetId: targetPlayer.id, targetKind: 'player', flipped: state.flipped });
-      else if (targetPlayer && card.effect.target === 'ally') act('play', { cardId: card.uid, targetId: targetPlayer.id, flipped: state.flipped });
+      if (targetEnemy) act('play', { cardId: card.uid, targetId: targetEnemy.id, targetKind: 'enemy' });
+      else if (targetPlayer && card.effect.target === 'ally') act('play', { cardId: card.uid, targetId: targetPlayer.id });
       else { showToast('Choose a foe in range.'); return; }
-      state.selectedCard = null; state.flipped = false; return;
+      state.selectedCard = null; return;
     }
-    if ((card.effect.heal || card.effect.target === 'ally' || (me.className === 'Rogue' && state.flipped && card.category === 'skill')) && targetPlayer) {
-      act('play', { cardId: card.uid, targetId: targetPlayer.id, targetKind: 'player', flipped: state.flipped }); state.selectedCard = null; state.flipped = false; return;
+    if ((card.effect.heal || card.effect.target === 'ally') && targetPlayer) {
+      act('play', { cardId: card.uid, targetId: targetPlayer.id, targetKind: 'player' }); state.selectedCard = null; return;
     }
     showToast('Choose a valid target, or select a different card.');
   }
@@ -290,7 +271,7 @@
     $('#party-list').innerHTML = game.players.map((player) => {
       const hpWidth = Math.max(0, Math.round(player.hp / player.maxHp * 100));
       const color = D.CLASSES[player.className]?.color || '#ddd';
-      const role = player.className ? `CLASS · ${player.className === 'Rogue' ? `Rogue · ${player.disguiseClass || 'hidden guise'}` : `${player.className}${player.subclass ? ` · ${player.subclass}` : ''}`} · LVL ${player.level} · ${D.CLASSES[player.className]?.role || player.className}` : 'Class dealt randomly at start';
+      const role = player.className ? `CLASS · ${player.className} · LVL ${player.level} · ${D.CLASSES[player.className]?.role || player.className}` : 'Class dealt randomly at start';
       const connectedState = connected.includes(player.id) ? 'online' : '';
       return `<div class="party-member ${player.id === state.playerId ? 'current' : ''} ${player.dead ? 'fallen' : ''}"><div class="avatar" style="color:${color}">${icons[player.className] || '●'}</div><div><div class="member-name">${escapeHtml(player.name)} ${player.id === state.playerId ? '<span class="you-tag">YOU</span>' : ''}${player.id === game.hostId ? '<span class="host-tag">HOST</span>' : ''}<i class="connection-state ${connectedState}" aria-label="${connectedState ? 'Online' : 'Reconnecting'}"></i></div><div class="member-class">${escapeHtml(role)}${player.left ? ' · LEFT' : player.dead ? ' · FALLEN' : ''}</div><div class="unit-effects">${effectBadges(player)}</div></div><div class="member-hp"><span class="hp-text">${player.hp}/${player.maxHp} HP</span><div class="hp-track"><i class="${hpWidth < 35 ? 'low' : ''}" style="width:${hpWidth}%"></i></div><div class="member-guard">◈ ${player.guard || 0} guard</div></div></div>`;
     }).join('');
@@ -306,7 +287,7 @@
     const enemies = game.roomState?.enemies?.filter((enemy) => enemy.hp > 0) || [];
     $('#foe-count').textContent = enemies.length ? `${enemies.length} REMAIN` : '';
     const effects = (enemy) => [...(enemy.buffs || []).map((effect) => ({ ...effect, good: true })), ...(enemy.debuffs || []).map((effect) => ({ ...effect, good: false }))].map((effect) => `<span class="status-badge ${effect.good ? 'good' : 'bad'}" data-tooltip="${escapeHtml(statusDescription(effect.type, effect.turns))}">${statusIcon(effect.type)} ${escapeHtml(effect.type)} · ${Number(effect.turns || 0)}T</span>`).join('');
-    $('#foe-list').innerHTML = enemies.length ? enemies.map((enemy) => `<div class="foe-row"><div class="foe-icon">${icons[enemy.name] || '♟'}</div><div><div class="foe-name">${escapeHtml(enemy.name)}${enemy.boss ? ' · BOSS' : ''}</div><div class="foe-ability">${escapeHtml(enemy.ability)}</div><div class="foe-effects">${effects(enemy) || '<span class="foe-status-empty">No status effects</span>'}</div>${enemy.lastCard ? `<div class="enemy-last-card">LAST · ${escapeHtml(enemy.lastCard.name)} · RANGE ${Number(enemy.lastCard.range || enemy.range)}</div>` : ''}<div class="hp-track"><i class="low" style="width:${Math.round(enemy.hp / enemy.maxHp * 100)}%"></i></div><div class="enemy-deck-count">DECK ${enemy.deckCount ?? 15} · DISCARD ${enemy.discardCount ?? 0}</div></div><div class="foe-health">${enemy.hp}<small>/${enemy.maxHp} HP</small><small>◈ ${enemy.guard || 0} Guard</small></div></div>`).join('') : `<div class="foe-empty">${game.phase === 'lobby' ? 'The hall is quiet — for now.' : game.phase === 'escape' ? 'No foes remain. Find the gate.' : 'All clear.'}</div>`;
+    $('#foe-list').innerHTML = enemies.length ? enemies.map((enemy) => `<div class="foe-row"><div class="foe-icon">${icons[enemy.name] || '♟'}</div><div><div class="foe-name">${escapeHtml(enemy.name)}${enemy.boss ? ' · BOSS' : ''}</div><div class="foe-ability">${escapeHtml(enemy.ability)}</div><div class="foe-effects">${effects(enemy) || '<span class="foe-status-empty">No status effects</span>'}</div>${enemy.lastCard ? `<div class="enemy-last-card">LAST · ${escapeHtml(enemy.lastCard.name)} · RANGE ${Number(enemy.lastCard.range || enemy.range)}</div>` : ''}<div class="hp-track"><i class="low" style="width:${Math.round(enemy.hp / enemy.maxHp * 100)}%"></i></div><div class="enemy-deck-count">DECK ${enemy.deckCount ?? 15} · DISCARD ${enemy.discardCount ?? 0}</div></div><div class="foe-health">${enemy.hp}<small>/${enemy.maxHp} HP</small><small>◈ ${enemy.guard || 0} Guard</small></div></div>`).join('') : `<div class="foe-empty">${game.phase === 'lobby' ? 'The hall is quiet — for now.' : game.phase === 'victory' ? 'The King is defeated.' : 'All clear.'}</div>`;
   }
 
   function renderLog(room, game) {
@@ -335,7 +316,7 @@
   function renderScoreboard(game) {
     const playerRows = game.players.map((player) => {
       const stats = player.stats || {};
-      const className = player.className === 'Rogue' ? `Rogue · ${player.disguiseClass || 'hidden guise'}` : `${player.className || 'Unassigned'}${player.subclass ? ` · ${player.subclass}` : ''}`;
+      const className = player.className || 'Unassigned';
       return `<tr><th>${escapeHtml(player.name)}<small>CLASS · ${escapeHtml(className)}</small></th><td>${stats.damageDealt || 0}</td><td>${stats.damageTaken || 0}</td><td>${stats.damageHealed || 0}</td><td>${stats.buffsGiven || 0}</td><td>${stats.debuffsGiven || 0}</td></tr>`;
     }).join('');
     const roomRows = (game.roomDurations || []).map((entry) => `<tr><th>Room ${entry.room}<small>${escapeHtml(entry.label)}</small></th><td colspan="5">${formatDuration(entry.durationMs)}</td></tr>`).join('');
@@ -363,12 +344,8 @@
     el.classList.remove('hidden'); el.innerHTML = `<strong>ROOM EFFECT · ${escapeHtml(room.modifier.name)}</strong><span>✦ ${escapeHtml(room.modifier.buff)} &nbsp;·&nbsp; ⚠ ${escapeHtml(room.modifier.debuff)}</span>`;
   }
 
-  function flippedCard(card) {
-    return ({ attack: { name: 'Backstab', text: 'Deal 2 damage. Rogue may target a player.' }, defense: { name: 'Fade Away', text: 'Gain 2 guard and become hard to target.' }, skill: { name: 'Lift Purse', text: 'Steal a consumable from an adjacent player or draw a card.' } })[card.category] || { name: 'Lift Purse', text: 'Steal a consumable or draw a card.' };
-  }
-
   function discardMoveValue(card, me, game) {
-    let value = (card.upgraded ? 3 : Number(card.rarity || (card.unique ? 2 : 1))) + statBonus(me, 'move');
+    let value = Number(card.rarity || (card.unique ? 2 : 1)) + statBonus(me, 'move');
     value += me.buffs.find((buff) => buff.type === 'freeMove')?.value || 0;
     if (combatClass(me) === 'Ranger' && me.played === 0) value++;
     if (game.roomState?.modifier?.rule === 'rough_move') value = Math.max(1, value - 1);
@@ -391,7 +368,7 @@
   function cardStats(card, effect, me, game) {
     const playerClass = combatClass(me);
     const attack = card.category === 'attack' || Number(effect.damage || 0) > 0;
-    const targeted = attack || effect.debuff || effect.taunt || effect.heal || effect.target === 'ally' || effect.target === 'enemy' || effect.stealItem;
+    const targeted = attack || effect.debuff || effect.taunt || effect.heal || effect.target === 'ally' || effect.target === 'enemy';
     const baseRange = Number(effect.range || (targeted ? effect.heal || effect.target === 'ally' ? 99 : effect.taunt || effect.debuff ? 4 : 1 : 0));
     const range = baseRange ? baseRange + (attack ? statBonus(me, 'range') + (playerClass === 'Ranger' ? 1 : 0) + (playerClass === 'Wizard' && card.unique ? 1 : 0) + Number(game.roomState?.modifier?.hero?.range || 0) : abilityBonus(me, 'range')) : 0;
     const stats = [];
@@ -408,7 +385,6 @@
     if (effect.cleanse) stats.push(['cleanse', 'Cleanse']);
     if (effect.lifesteal) stats.push(['heal', `Drain ${effect.lifesteal}`]);
     if (effect.unpushable) stats.push(['guard', 'Hold Fast']);
-    if (effect.stealItem) stats.push(['utility', 'Steal']);
     if (range) stats.push(['range', range >= 99 ? 'Range · All Tiles' : `Range ${range}`]);
     return `<div class="card-stats">${stats.map(([kind, label]) => `<span class="card-stat ${kind}">${escapeHtml(label)}</span>`).join('')}</div>`;
   }
@@ -436,9 +412,9 @@
   function activateHandCard(card, me) {
     if (!card || !me) return;
     if (me.ended) { showToast('Your turn is already ended.'); return; }
-    if (state.selectedCard === card.uid) { state.selectedCard = null; state.flipped = false; render(); return; }
-    state.selectedCard = card.uid; state.flipped = false;
-    const targetRequired = card.category === 'attack' || card.effect.damage || card.effect.debuff || card.effect.taunt || card.effect.heal || card.effect.target === 'ally' || card.effect.target === 'enemy' || (me.className === 'Rogue' && card.unique && state.flipped && card.category === 'skill');
+    if (state.selectedCard === card.uid) { state.selectedCard = null; render(); return; }
+    state.selectedCard = card.uid;
+    const targetRequired = card.category === 'attack' || card.effect.damage || card.effect.debuff || card.effect.taunt || card.effect.heal || card.effect.target === 'ally' || card.effect.target === 'enemy';
     if (!targetRequired) { act('play', { cardId: card.uid }); state.selectedCard = null; }
     else state.mobileTab = 'map';
     render();
@@ -462,29 +438,26 @@
     });
     const grouped = new Map();
     for (const card of deck) {
-      const key = `${card.id}:${card.upgraded ? card.upgradeFocus || 'evolved' : 'base'}`;
+      const key = card.id;
       const entry = grouped.get(key) || { card, copies: 0 };
       entry.copies++; grouped.set(key, entry);
     }
     const order = { attack: 0, defense: 1, skill: 2, movement: 3 };
-    $('#deck-list').innerHTML = grouped.size ? [...grouped.values()].sort((a, b) => order[a.card.category] - order[b.card.category] || a.card.name.localeCompare(b.card.name)).map(({ card, copies }) => `<article class="deck-row ${card.category}"><div class="deck-row-heading"><strong>${escapeHtml(card.name)}${card.upgraded ? ' · EVOLVED' : ''}</strong><span>× ${copies}</span></div><div class="deck-row-category">${escapeHtml(card.category)}${card.unique ? ' · CLASS' : ' · BASIC'}</div><p>${escapeHtml(cardTextForPlayer(card, card.effect, me))}</p>${cardStats(card, card.effect, me, game)}</article>`).join('') : '<p class="empty-hand">Your deck is empty.</p>';
+    $('#deck-list').innerHTML = grouped.size ? [...grouped.values()].sort((a, b) => order[a.card.category] - order[b.card.category] || a.card.name.localeCompare(b.card.name)).map(({ card, copies }) => `<article class="deck-row ${card.category}"><div class="deck-row-heading"><strong>${escapeHtml(card.name)}</strong><span>× ${copies}</span></div><div class="deck-row-category">${escapeHtml(card.category)}${card.unique ? ' · CLASS' : ' · BASIC'}</div><p>${escapeHtml(cardTextForPlayer(card, card.effect, me))}</p>${cardStats(card, card.effect, me, game)}</article>`).join('') : '<p class="empty-hand">Your deck is empty.</p>';
     $('#hand-cards').innerHTML = me.hand.length ? me.hand.map((card, index) => {
       const selected = state.selectedCard === card.uid;
-      const flip = me.className === 'Rogue' && card.unique;
-      const variant = state.flipped && selected && flip ? flippedCard(card) : null;
-      const effect = variant ? visualEffect(card, me) : card.effect;
+      const effect = card.effect;
       const moveValue = discardMoveValue(card, me, game);
       const quickHelp = cardTooltip(card, effect, me, moveValue);
       const locked = me.ended || me.played >= playLimit;
-      return `<div class="card-slot"><button class="card ${card.category} ${selected ? 'selected' : ''} ${variant ? 'flipped' : ''}" data-card="${card.uid}" data-tooltip="${escapeHtml(quickHelp)}"><span class="card-key" aria-hidden="true">${index < 9 ? index + 1 : ''}</span><span class="card-name">${escapeHtml(variant?.name || card.name)}</span><span class="card-category">${escapeHtml(card.category)}${card.upgraded ? ' · EVOLVED' : ''}</span><span class="card-text">${escapeHtml(cardTextForPlayer(variant ? { ...card, text: variant.text } : card, effect, me))}</span>${cardStats(card, effect, me, game)}<span class="card-bottom"><span></span><span class="card-pips" title="${moveValue} dot${moveValue === 1 ? '' : 's'} = move up to ${moveValue} tile${moveValue === 1 ? '' : 's'} if discarded" aria-label="Discard movement: ${moveValue} tile${moveValue === 1 ? '' : 's'}">${Array.from({ length: moveValue }, () => '<i></i>').join('')}</span></span>${flip ? `<span class="flip-mark" data-flip="${card.uid}">${variant ? 'UNFLIP' : 'FLIP'}</span>` : ''}</button><button class="discard-card" data-discard="${card.uid}" ${locked ? 'disabled' : ''}>DISCARD · USE A PLAY</button><button class="discard-move-card" data-discard-move="${card.uid}" ${locked ? 'disabled' : ''} title="Discard this card to move up to ${moveValue} tiles">DISCARD TO MOVE · ${moveValue}</button></div>`;
+      return `<div class="card-slot"><button class="card ${card.category} ${selected ? 'selected' : ''}" data-card="${card.uid}" data-tooltip="${escapeHtml(quickHelp)}"><span class="card-key" aria-hidden="true">${index < 9 ? index + 1 : ''}</span><span class="card-name">${escapeHtml(card.name)}</span><span class="card-category">${escapeHtml(card.category)}</span><span class="card-text">${escapeHtml(cardTextForPlayer(card, effect, me))}</span>${cardStats(card, effect, me, game)}<span class="card-bottom"><span></span><span class="card-pips" title="${moveValue} dot${moveValue === 1 ? '' : 's'} = move up to ${moveValue} tile${moveValue === 1 ? '' : 's'} if discarded" aria-label="Discard movement: ${moveValue} tile${moveValue === 1 ? '' : 's'}">${Array.from({ length: moveValue }, () => '<i></i>').join('')}</span></span></button><button class="discard-card" data-discard="${card.uid}" ${locked ? 'disabled' : ''}>DISCARD · USE A PLAY</button><button class="discard-move-card" data-discard-move="${card.uid}" ${locked ? 'disabled' : ''} title="Discard this card to move up to ${moveValue} tiles">DISCARD TO MOVE · ${moveValue}</button></div>`;
     }).join('') : '<div class="empty-hand">Your hand is empty. When the draw pile runs out, your discard is shuffled back in.</div>';
     $('#hand-cards').querySelectorAll('.card').forEach((node) => node.addEventListener('click', (event) => {
       const card = me.hand.find((held) => held.uid === node.dataset.card); if (!card) return;
-      if (event.target.closest('[data-flip]')) { if (state.selectedCard !== card.uid) { state.selectedCard = card.uid; state.flipped = true; } else state.flipped = !state.flipped; state.mobileTab = 'map'; render(); return; }
       activateHandCard(card, me);
     }));
-    $('#hand-cards').querySelectorAll('.discard-card').forEach((button) => button.addEventListener('click', () => { act('discardCard', { cardId: button.dataset.discard }); state.selectedCard = null; state.flipped = false; }));
-    $('#hand-cards').querySelectorAll('.discard-move-card').forEach((button) => button.addEventListener('click', () => { state.discardMoveCardId = button.dataset.discardMove; state.selectedCard = null; state.flipped = false; state.mobileTab = 'map'; render(); }));
+    $('#hand-cards').querySelectorAll('.discard-card').forEach((button) => button.addEventListener('click', () => { act('discardCard', { cardId: button.dataset.discard }); state.selectedCard = null; }));
+    $('#hand-cards').querySelectorAll('.discard-move-card').forEach((button) => button.addEventListener('click', () => { state.discardMoveCardId = button.dataset.discardMove; state.selectedCard = null; state.mobileTab = 'map'; render(); }));
   }
 
   function renderReward(game, me) {
@@ -493,7 +466,6 @@
     panel.classList.remove('hidden');
     const choice = game.reward.choices[me.id];
     if (!choice) { panel.innerHTML = '<p>Reward choices unavailable. Reconnect to continue.</p>'; return; }
-    const subclassPrompt = choice.subclassOptions?.length;
     const drafterId = game.reward.draftOrder?.[game.reward.draftIndex] || null;
     const drafter = game.players.find((player) => player.id === drafterId);
     const canDraft = drafterId === me.id;
@@ -502,7 +474,6 @@
     let abilityMarkup = '';
     if (choice.abilityChosen) abilityMarkup = `<div class="reward-choice">✦ You chose <strong>${escapeHtml(myAbility?.name || 'an ability')}</strong>. ${escapeHtml(myAbility?.text || '')}</div>`;
     else abilityMarkup = `<div class="reward-options">${choice.abilityOptions.map((offer) => `<button class="reward-option" data-ability="${escapeHtml(offer.id)}"><b>${escapeHtml(offer.name)}</b><p>${escapeHtml(offer.text)}</p></button>`).join('')}</div>`;
-    const subclassMarkup = subclassPrompt ? `<div class="reward-section-title">ROOM 6 · CHOOSE YOUR PATH</div><div class="reward-options">${choice.subclassOptions.map((name) => `<button class="reward-option subclass-option" data-subclass="${escapeHtml(name)}"><b>${escapeHtml(name)}</b><p>${escapeHtml(subclassText(name))}</p></button>`).join('')}</div>` : '';
     const offers = game.reward.items.map((item) => {
       const done = !!item.claimedBy;
       const recipient = item.claimedBy === 'left' ? null : game.players.find((player) => player.id === item.claimedBy);
@@ -513,9 +484,9 @@
     }).join('');
     const ready = choice.ready;
     const draftStatus = lootComplete ? 'The loot draft is complete.' : canDraft ? 'It is your turn. Choose an item and assign it to any living hero, or pass.' : drafter ? `${escapeHtml(drafter.name)} is choosing who gets the next item.` : 'No more loot picks remain.';
-    panel.innerHTML = `<div class="reward-title">Room ${game.roomState.room} cleared.</div><p class="reward-subtitle">Choose a passive, then share the item draft. ${draftStatus}</p>${subclassMarkup}<div class="reward-section-title">YOUR NEW ABILITY</div>${abilityMarkup}<div class="reward-section-title">ROTATING LOOT DRAFT · ${game.reward.items.length} ITEMS</div><div class="draft-order">${(game.reward.draftOrder || []).map((id, index) => `<span class="draft-player ${id === drafterId ? 'current-drafter' : ''}">${index + 1}. ${escapeHtml(game.players.find((player) => player.id === id)?.name || 'Hero')}</span>`).join('')}</div><div class="reward-items">${offers || '<span class="member-class">No items this room.</span>'}</div><div class="reward-footer"><p>${ready ? 'You are ready. Waiting for the rest of the crew.' : 'Your class deck and passives stay with you between rooms.'}</p><div class="reward-footer-actions">${canDraft ? '<button id="pass-loot" class="button button-quiet">PASS PICK</button>' : ''}<button id="ready-reward" class="button button-primary" ${!choice.abilityChosen || subclassPrompt || ready || !lootComplete ? 'disabled' : ''}>${ready ? 'READY' : 'READY FOR NEXT ROOM'} <span>↗</span></button></div></div>`;
+    const finalRoom = game.roomState.room === 6;
+    panel.innerHTML = `<div class="reward-title">Room ${game.roomState.room} cleared.</div><p class="reward-subtitle">Choose a passive, then share the item draft. ${draftStatus}</p><div class="reward-section-title">YOUR NEW ABILITY</div>${abilityMarkup}<div class="reward-section-title">ROTATING LOOT DRAFT · ${game.reward.items.length} ITEMS</div><div class="draft-order">${(game.reward.draftOrder || []).map((id, index) => `<span class="draft-player ${id === drafterId ? 'current-drafter' : ''}">${index + 1}. ${escapeHtml(game.players.find((player) => player.id === id)?.name || 'Hero')}</span>`).join('')}</div><div class="reward-items">${offers || '<span class="member-class">No items this room.</span>'}</div><div class="reward-footer"><p>${ready ? 'You are ready. Waiting for the rest of the crew.' : finalRoom ? 'After the crew finishes rewards, the keep is yours.' : 'Your class deck and passives stay with you between rooms.'}</p><div class="reward-footer-actions">${canDraft ? '<button id="pass-loot" class="button button-quiet">PASS PICK</button>' : ''}<button id="ready-reward" class="button button-primary" ${!choice.abilityChosen || ready || !lootComplete ? 'disabled' : ''}>${ready ? 'READY' : finalRoom ? 'FINISH THE KEEP' : 'READY FOR NEXT ROOM'} <span>↗</span></button></div></div>`;
     panel.querySelectorAll('[data-ability]').forEach((button) => button.addEventListener('click', () => act('chooseAbility', { abilityId: button.dataset.ability })));
-    panel.querySelectorAll('[data-subclass]').forEach((button) => button.addEventListener('click', () => act('chooseSubclass', { subclass: button.dataset.subclass })));
     panel.querySelectorAll('[data-claim]').forEach((button) => button.addEventListener('click', () => {
       const slot = Number(button.dataset.claim);
       const recipientId = panel.querySelector(`[data-recipient="${slot}"]`)?.value;
@@ -525,29 +496,11 @@
     $('#ready-reward')?.addEventListener('click', () => act('readyReward'));
   }
 
-  function subclassText(name) {
-    const text = { Archmage: 'Turn wide spells into devastating room control.', Arcanist: 'Lean into tricks, utility, and a larger hand.', Mender: 'Make healing and protection reach further.', Hexweaver: 'Let curses spread and drain the castle.', Warlord: 'Hold the line and rally everyone around you.', Reaver: 'Turn sweeping attacks into stolen life.', Deadeye: 'Make each precise shot count.', Windstalker: 'Move freely and leave enemies tangled.', Duelist: 'Commit to one foe and win the exchange.', 'Bounty Hunter': 'Isolate a target and cut off escape.', Sentinel: 'Protect the crew with heavier guard.', Justiciar: 'Turn shield shoves into punishment.', Assassin: 'Strike first from the shadows.', Thief: 'Slip past the guards and make the relic yours.' };
-    return text[name] || 'Evolve your unique cards toward a sharper focus.';
-  }
-
-  function renderEscape(game, me) {
-    const panel = $('#escape-panel');
-    if (game.phase !== 'escape' || !me) { panel.classList.add('hidden'); panel.innerHTML = ''; $('#escape-step').classList.add('hidden'); return; }
-    panel.classList.remove('hidden');
-    const escaped = me.escaped;
-    const exit = game.roomState.exit;
-    const distance = Math.max(Math.abs(me.x - exit.x), Math.abs(me.y - exit.y));
-    panel.innerHTML = `<div class="panel-kicker">FINAL ROOM · GET OUT</div><h2>${me.artifact ? 'The relic is in your hands.' : 'The vault is behind you.'}</h2><p>${me.className === 'Rogue' && me.artifact ? 'Make it to the gate alone to win the heist.' : 'Move one tile at a time. Any living crew member can reach the gate to carry the crew’s escape.'}</p><div class="escape-status">${escaped ? 'YOU ARE THROUGH THE GATE.' : distance === 0 ? 'YOU ARE ON THE GATE. Claim the escape.' : `${distance} TILE${distance === 1 ? '' : 'S'} TO THE RED GATE.`}</div>${distance === 0 && !escaped ? '<button class="button button-primary" id="claim-escape">ESCAPE WITH THE RELIC ↗</button>' : ''}`;
-    $('#claim-escape')?.addEventListener('click', () => act('escape'));
-    $('#escape-step').classList.toggle('hidden', escaped);
-  }
-
   function applyMobileLayout(game) {
     const compact = matchMedia('(max-width: 1000px)').matches;
     const sideTabs = ['party', 'foes', 'log', 'chat', 'score'];
     if (compact) {
       if (game.phase === 'reward') state.mobileTab = 'hand';
-      else if (game.phase === 'escape') state.mobileTab = 'map';
       else if (game.phase === 'victory' || game.phase === 'defeat') state.mobileTab = 'score';
       document.querySelectorAll('[data-mobile-pane]').forEach((node) => node.classList.toggle('mobile-pane-hidden', node.dataset.mobilePane !== state.mobileTab));
     } else {
@@ -562,7 +515,7 @@
   }
 
   function renderActions(game, me) {
-    if (!me || game.phase !== 'battle') { $('#end-turn').classList.add('hidden'); $('#steal-artifact').classList.add('hidden'); }
+    if (!me || game.phase !== 'battle') $('#end-turn').classList.add('hidden');
     else {
       const end = $('#end-turn'); end.classList.remove('hidden'); end.disabled = me.ended || me.dead;
       end.innerHTML = me.ended ? 'WAITING FOR CREW' : 'END TURN <kbd>E</kbd> <span>↗</span>';
@@ -570,20 +523,14 @@
       const caption = me.dead ? 'You have fallen.' : me.ended ? active.length ? `Waiting for ${active.join(', ')} to end turn.` : 'Enemies draw and act immediately.' : `${Math.max(0, Number(me.playLimit || 2) - me.played)} card plays left this turn`;
       $('.turn-caption span:last-child').textContent = caption;
       $('.turn-caption').classList.toggle('waiting', me.ended || me.dead);
-      const canSteal = me.className === 'Rogue' && game.roomState.room === 12 && game.roomState.artifact === 'sealed';
-      $('#steal-artifact').classList.toggle('hidden', !canSteal); $('#steal-artifact').disabled = !canSteal;
     }
-    if (game.phase === 'escape' && me && !me.escaped) $('#escape-step').classList.remove('hidden');
     $('#end-turn').onclick = () => act('end');
-    $('#steal-artifact').onclick = () => act('steal');
-    $('#escape-step').onclick = () => { state.stepMode = true; state.selectedCard = null; render(); };
   }
 
   function showEndScreen(game) {
     $('#reward-panel').classList.remove('hidden'); $('#hand-panel').classList.add('hidden');
     const victory = game.phase === 'victory';
-    const wonByRogue = game.winner === 'Rogue';
-    $('#reward-panel').innerHTML = `<div class="end-screen"><div class="seal">${victory ? (wonByRogue ? '♠' : '✦') : '☠'}</div><h2>${victory ? wonByRogue ? 'A quieter kind of crown.' : 'The crew made it out.' : 'The keep keeps its secret.'}</h2><p>${victory ? wonByRogue ? 'The Rogue slipped away with the relic. The castle wakes to an empty vault.' : 'Twelve rooms behind you. The artifact is safe in the crew’s hands.' : 'The party has fallen before the relic reached the gate.'}</p><button class="button button-quiet" onclick="localStorage.removeItem('crownfall-room');location.href='/'">RETURN TO THE KEEP ↗</button></div>`;
+    $('#reward-panel').innerHTML = `<div class="end-screen"><div class="seal">${victory ? '✦' : '☠'}</div><h2>${victory ? 'The curse is broken.' : 'The keep keeps its dead.'}</h2><p>${victory ? 'The Giant Skeleton King falls, and the cursed keep is free.' : 'The crew fell before it could reach the Bone Throne.'}</p><button class="button button-quiet" onclick="localStorage.removeItem('crownfall-room');location.href='/'">RETURN TO THE KEEP ↗</button></div>`;
   }
 
   function leaveGame() {
@@ -593,7 +540,7 @@
       socket.close();
     }
     state.socket = null; state.game = null; state.roomCode = ''; state.playerId = crypto.randomUUID();
-    state.selectedCard = null; state.flipped = false; state.stepMode = false;
+    state.selectedCard = null; state.stepMode = false;
     localStorage.removeItem('crownfall-room'); localStorage.removeItem('crownfall-player');
     $('#game-view').classList.add('hidden'); $('#home-view').classList.remove('hidden'); closeGuide();
     history.replaceState({}, '', location.pathname);
@@ -650,3 +597,4 @@
   if (state.roomCode && state.roomCode === invite?.toUpperCase() && localStorage.getItem('crownfall-player')) reconnectSeat();
   else if (!invite && state.roomCode && localStorage.getItem('crownfall-player')) reconnectSeat();
 })();
+
