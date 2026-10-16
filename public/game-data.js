@@ -10,14 +10,13 @@
     Barbarian: { icon: '⚒', hp: 16, color: '#d57955', role: 'Front-line breaker', passive: 'Reduce the first damage you take each round by 1.' },
     Ranger: { icon: '➶', hp: 9, color: '#94ad65', role: 'Mobile marksman', passive: 'Ranged attacks gain +1 range; your first move each round goes 1 tile farther.' },
     Swordsman: { icon: '⚔', hp: 11, color: '#d7ae67', role: 'Duelist', passive: 'Hit the same foe twice in one round to deal +2 damage on the second hit.' },
-    Knight: { icon: '⬟', hp: 14, color: '#8eaac2', role: 'Shield & control', passive: 'Your guard lasts through the enemy turn; enemies you push deal 1 less damage next turn.' },
-    Rogue: { icon: '♠', hp: 10, color: '#cf7e85', role: 'Hidden saboteur', passive: 'Disguise as an unused class. Flip any class card into a sly Rogue trick.' }
+    Knight: { icon: '⬟', hp: 14, color: '#8eaac2', role: 'Shield & control', passive: 'Your guard lasts through the enemy turn; enemies you push deal 1 less damage next turn.' }
   };
 
   const effectCategory = (effect, fallback) => {
     if (effect.damage || effect.push || effect.splash || effect.lifesteal) return 'attack';
     if (effect.shield || effect.cancelRanged || effect.redirect || effect.evade || effect.unpushable) return 'defense';
-    if (effect.heal || effect.debuff || effect.buff || effect.draw || effect.taunt || effect.cleanse || effect.stealItem) return 'skill';
+    if (effect.heal || effect.debuff || effect.buff || effect.draw || effect.taunt || effect.cleanse) return 'skill';
     if (effect.move) return 'movement';
     return fallback;
   };
@@ -97,11 +96,6 @@
     ]
   };
 
-  const SUBCLASSES = {
-    Wizard: ['Archmage', 'Arcanist'], Weaver: ['Mender', 'Hexweaver'], Barbarian: ['Warlord', 'Reaver'],
-    Ranger: ['Deadeye', 'Windstalker'], Swordsman: ['Duelist', 'Bounty Hunter'], Knight: ['Sentinel', 'Justiciar'],
-    Rogue: ['Assassin', 'Thief']
-  };
   const ABILITIES = {
     Wizard: [
       ['Deep Reserves', 'Start each room with 1 guard.', 'guard', 1], ['Quick Study', 'Draw 1 extra card each turn.', 'hand', 1], ['Long Reach', '+1 range on your attacks.', 'range', 1], ['Careful Casting', 'Your first attack each round deals +1 damage.', 'damage', 1], ['Blink Reflex', 'When attacked, blink 1 tile if one is open.', 'evade', 1],
@@ -121,7 +115,7 @@
     Ranger: [
       ['Eagle Eye', '+1 range on ranged attacks.', 'range', 1], ['Light Step', 'Your first move each turn gains +1 tile.', 'move', 1], ['Marked Shot', 'Deal +1 damage to marked foes.', 'debuffDamage', 1], ['Roll Away', 'The first ranged attack against you each round misses.', 'evade', 1], ['Field Rations', 'Start each room with 1 guard.', 'guard', 1],
       ['Quick Draw', 'Draw 1 card on your first ranged hit each round.', 'hitDraw', 1], ['Longstride', '+1 movement.', 'move', 1], ['Clean Shot', 'Deal +1 damage if no foe is adjacent.', 'damage', 1], ['Trapwise', 'Rooted foes take 1 damage at turn end.', 'rootDamage', 1], ['Skirmisher', 'After a kill, move 1 tile for free.', 'killMove', 1],
-      ['Tactical Retreat', 'When hit, gain 1 guard and move 1 tile.', 'evade', 1], ['True Aim', 'Attacks ignore 1 guard.', 'pierce', 1], ['Trailblazer', 'Jump cards can move +1 tile.', 'move', 1], ['Poisoned Tip', 'Your first debuff each round deals 1 damage.', 'debuffDamage', 1], ['Last Arrow', 'At 1 HP, your attacks deal +2 damage.', 'lowHpDamage', 2]
+      ['Tactical Retreat', 'When hit, gain 1 guard and move 1 tile.', 'evade', 1], ['True Aim', 'Attacks ignore 1 guard.', 'pierce', 1], ['Trailblazer', 'Discarding a card to move gains +1 tile.', 'move', 1], ['Poisoned Tip', 'Your first debuff each round deals 1 damage.', 'debuffDamage', 1], ['Last Arrow', 'At 1 HP, your attacks deal +2 damage.', 'lowHpDamage', 2]
     ],
     Swordsman: [
       ['Single Out', 'Deal +1 damage to the foe you last attacked.', 'focus', 1], ['Riposte Form', 'Gain 1 guard after a parry.', 'riposteGuard', 1], ['Measured Step', 'Move +1 tile when closing on a wounded foe.', 'move', 1], ['Blade Discipline', 'Your first attack each turn costs no hand card once per room.', 'freeAttack', 1], ['Read the Guard', 'Deal +1 damage to guarded foes.', 'pierce', 1],
@@ -135,57 +129,41 @@
     ]
   };
 
-  const SUB_ABILITIES = {
-    Archmage: [['Cataclysm', 'Your splash attacks deal +2 damage.', 'splashDamage', 2], ['Wide Arc', '+1 tile to every splash radius.', 'splash', 1], ['Spellstorm', 'A kill with a spell hits another foe within 1 tile of its target for 1.', 'killGuard', 1], ['Searing Edges', 'Attack cards add burn: 1 damage next enemy turn.', 'burn', 1], ['Deep Impact', 'Bosses take +1 spell damage.', 'bossDamage', 1], ['Overload', 'First attack card each round costs no action.', 'freeAttack', 1], ['Scorching Return', 'When hit, burn the attacker.', 'thorns', 1], ['Elemental Reach', '+1 range to attack cards.', 'range', 1], ['Cascade', 'Splash may chain one more target.', 'splash', 1], ['Apocalypse Ready', 'At full HP, first attack deals +2.', 'damage', 2]],
-    Arcanist: [['Pocket Dimension', 'Hand size +1.', 'hand', 1], ['Second Thought', 'Draw 1 after playing a skill.', 'skillGuard', 1], ['Runic Safety', 'Your utility cards give 2 guard.', 'guard', 2], ['Unravel', 'Cleanse yourself on room entry.', 'cleanse', 1], ['Far Step', 'Discarding a card to move grants +2 tiles.', 'move', 2], ['Arcane Cache', 'Draw 1 extra card after each room.', 'roomDraw', 1], ['Counterspell', 'Cancel the first ranged enemy attack each room.', 'evade', 1], ['Lesser Wish', 'One ally skill can target all adjacent allies.', 'heal', 1], ['Mana Shell', 'Gain 1 guard when you draw outside turn start.', 'guard', 1], ['Quick Casting', 'The first skill each round does not count toward the card limit.', 'freeSkill', 1]],
-    Mender: [['Greater Mend', 'Healing restores +2 more HP.', 'heal', 2], ['Circle of Care', 'Your heal reaches a second nearby ally for 2.', 'heal', 2], ['Renewal', 'Heal 1 HP at every turn start.', 'turnStartHeal', 1], ['Shared Vitality', 'Healing you receive also heals a nearby ally 1.', 'heal', 1], ['Last Hope', 'Revive a fallen ally once at 5 HP.', 'revive', 5], ['Soft Shield', 'Every heal gives 2 guard.', 'healGuard', 2], ['Calm Hands', 'Draw 1 whenever you heal a wounded ally.', 'healDraw', 1], ['Group Stitch', 'Room-clear healing restores 2 HP to everyone.', 'heal', 2], ['Clean Pulse', 'Cleanses also heal 2.', 'heal', 2], ['Unfading Thread', 'Buffs on allies last the whole room.', 'buffDuration', 1]],
-    Hexweaver: [['Deep Hex', 'Debuffs you apply last +2 rounds.', 'debuff', 2], ['Pain Knot', 'Weak foes take +2 damage.', 'debuffDamage', 2], ['Withering Loop', 'First foe debuffed each turn loses 1 HP.', 'debuffDamage', 1], ['Snaring Pattern', 'Root affects foes beside the target.', 'splash', 1], ['Bad Omen', 'Debuffed enemies deal 2 less damage.', 'debuffDamage', 2], ['Tangle Mind', 'Debuffing a foe gives you 1 guard.', 'skillGuard', 1], ['Hex Shield', 'Your debuffs grant a nearby ally 1 guard.', 'allyGuard', 1], ['Brittle Fate', 'Your attacks deal +2 to weakened foes.', 'debuffDamage', 2], ['Black Thread', 'Rooted foes cannot target allies.', 'tauntGuard', 1], ['Fate Unspooled', 'Draw 1 after a debuffed foe falls.', 'killDraw', 1]],
-    Warlord: [['Commanding Voice', 'Taunt reaches +2 tiles.', 'taunt', 2], ['Iron Formation', 'Adjacent allies gain 2 guard at turn end.', 'allyGuard', 2], ['War Banner', 'All allies deal +1 damage while beside you.', 'adjacentBuff', 1], ['No Retreat', 'You and adjacent allies cannot be pushed.', 'unpushable', 1], ['Punishing Guard', 'Foes that attack you take 2 damage.', 'thorns', 2], ['Rally', 'On a kill, all allies heal 1.', 'killHeal', 1], ['Bastion Roar', 'Taunted foes deal 2 less damage.', 'tauntGuard', 2], ['Stand Together', 'Gain 1 guard per adjacent ally.', 'guard', 1], ['War Tested', 'Reduce boss hits by 2.', 'reduction', 2], ['Lead the Charge', 'Adjacent allies move +1 tile.', 'move', 1]],
-    Reaver: [['Blood Drinker', 'Heal 2 on every kill.', 'killHeal', 2], ['Wide Fury', 'Sweeps deal +2 damage.', 'splashDamage', 2], ['Relentless', 'Deal +2 damage below half HP.', 'lowHpDamage', 2], ['Life for Life', 'Heal for half your attack damage.', 'lifesteal', 1], ['Red Harvest', 'A kill grants 2 guard.', 'killGuard', 2], ['Crushing Weight', 'Push +1 tile and deal 1 extra.', 'push', 1], ['Pain into Power', 'When hit, your next attack gains +2 damage.', 'damage', 2], ['Cleave Through', 'Splash attacks chain to 2 foes.', 'splash', 2], ['Last One Standing', 'Deal +2 while no ally is adjacent.', 'damage', 2], ['Feast of Kings', 'Boss kill restores 5 HP.', 'bossHeal', 5]],
-    Deadeye: [['Vital Mark', 'Marked foes take +3 ranged damage.', 'debuffDamage', 3], ['Perfect Sight', '+2 attack range.', 'range', 2], ['Piercing Shot', 'Ignore 2 guard.', 'pierce', 2], ['Weak Point', 'Critical hits on bosses deal +2.', 'bossDamage', 2], ['Double Tap', 'First ranged hit can strike again for 1.', 'damage', 1], ['Quarry', 'Keep a target marked between rooms.', 'debuff', 1], ['Quick Reload', 'Draw 1 after a ranged kill.', 'killDraw', 1], ['Still Aim', 'If you do not move, attacks deal +2.', 'damage', 2], ['Poisoned Broadhead', 'Ranged hits apply weak.', 'debuffDamage', 1], ['Last Word', 'Your first attack hits the boss at any range.', 'range', 2]],
-    Windstalker: [['Windwalk', '+2 movement.', 'move', 2], ['Slipstream', 'Discarding a card to move grants +1 tile.', 'move', 1], ['Smoke Veil', 'Ranged foes cannot target you after you move.', 'evade', 1], ['Rolling Snare', 'Root also affects foes within 1 tile of the target.', 'splash', 1], ['Ghost Step', 'You evade the first hit each turn.', 'evade', 1], ['Roving Aim', 'Deal +1 after moving this turn.', 'damage', 1], ['Tangle Trap', 'Rooted foes lose 2 damage.', 'debuffDamage', 2], ['Swift Hands', 'Draw a card after a 2+ tile move.', 'hitDraw', 1], ['Canny Escape', 'On hit, move 1 tile.', 'evade', 1], ['Silent Quarry', 'Your debuffed targets cannot retaliate.', 'debuff', 1]],
-    Duelist: [['Opening Gambit', 'First hit each round deals +2.', 'damage', 2], ['Unbroken Rhythm', 'Every second hit draws a card.', 'hitDraw', 1], ['Challenge Accepted', 'Focused foe deals 2 less damage.', 'reduction', 2], ['Find the Gap', 'Ignore 1 guard on your focused target.', 'pierce', 1], ['Swift Riposte', 'Parries deal +2 damage.', 'damage', 2], ['Close In', 'Discarding a card to move grants +1 tile.', 'move', 1], ['Finish Clean', 'Focused foes below half take +3 damage.', 'focus', 3], ['Blade Ward', 'Gain 2 guard after a kill.', 'killGuard', 2], ['Perfect Duel', 'Focused boss takes +2 damage.', 'bossDamage', 2], ['Measured Tempo', 'Hand size +1 while only one foe is within 1 tile of you.', 'hand', 1]],
-    'Bounty Hunter': [['Isolate', 'Foes with no adjacent allies take +2.', 'damage', 2], ['No Escape', 'Push targets toward you instead.', 'push', 1], ['Marked Contract', 'Marked foes take +2 from everyone.', 'debuffDamage', 2], ['Clean Finish', 'Gain 2 guard after a kill.', 'killGuard', 2], ['Cut Off', 'Adjacent foes cannot move past you.', 'tauntGuard', 1], ['Hunt Begins', 'Draw 1 when you mark a new foe.', 'hitDraw', 1], ['Executioner', 'Deal +3 to foes below quarter HP.', 'damage', 3], ['Pin Down', 'Your root lasts an extra turn.', 'debuff', 1], ['Cold Pursuit', 'Move 2 toward your focus at turn start.', 'move', 2], ['Dread Presence', 'Isolated foes deal 2 less damage.', 'debuffDamage', 2]],
-    Sentinel: [['Aegis', 'Gain 2 guard whenever you defend.', 'shield', 2], ['Safe Haven', 'Adjacent allies reduce damage by 2.', 'allyGuard', 2], ['Wall of Steel', 'Cannot be pushed; reduce all damage by 1.', 'unpushable', 1], ['Counterwall', 'Pushers take 2 damage.', 'thorns', 2], ['Guardian Step', 'Move 1 to an ally targeted by an attack.', 'move', 1], ['Long Guard', 'Guard lasts through the next full round.', 'shield', 1], ['Shielded Company', 'Allies beside you gain +1 guard.', 'adjacentBuff', 1], ['Heavy Plate', 'Reduce boss attacks by 2.', 'reduction', 2], ['Holdfast', 'Enemies beside you deal 2 less damage.', 'tauntGuard', 2], ['Bastion', 'Once per room, ignore all damage from one source.', 'rescue', 1]],
-    Justiciar: [['Judgment', 'Your push cards deal +2 damage.', 'pushDamage', 2], ['Sentence', 'Dazed foes lose their next action.', 'debuff', 1], ['Severe Rebuke', 'Your debuffed foes deal 2 less.', 'debuffDamage', 2], ['Righteous Charge', 'Push up to 3 tiles.', 'push', 2], ['Hammer of Law', 'Shield Bash stuns bosses for one round.', 'debuff', 1], ['Public Example', 'A pushed foe weakens foes within 1 tile of it.', 'splash', 1], ['Punitive Guard', 'Attackers take 3 damage.', 'thorns', 3], ['Escort', 'Move an ally 2 and give 3 guard.', 'move', 1], ['Inexorable', 'Immune to root and shove.', 'unpushable', 1], ['Final Warning', 'Boss takes +2 while taunted by you.', 'bossDamage', 2]],
-    Assassin: [['First Blood', 'Your first hit on a full-health foe deals +3.', 'damage', 3], ['Quiet Knife', 'Attacks from behind deal +2.', 'damage', 2], ['Poisoned Edge', 'Attacks apply weak.', 'debuffDamage', 1], ['Vanish', 'After a kill, evade the next attack.', 'evade', 1], ['Blood Price', 'Heal 2 on a kill.', 'killHeal', 2], ['Lethal Opening', 'Deal +2 to isolated foes.', 'damage', 2], ['Shadowstep', 'Move 2 after an attack.', 'move', 2], ['Marked for Death', 'Your mark lasts the room.', 'debuff', 1], ['No Witnesses', 'Deal +2 when no ally can see you.', 'damage', 2], ['Last Cut', 'Below half HP, attacks deal +3.', 'lowHpDamage', 3]],
-    Thief: [['Light Fingers', 'Draw 1 when you claim loot.', 'hitDraw', 1], ['Smoke Bomb', 'Evade the first hit each round.', 'evade', 1], ['Slip Away', 'Discarding a card to move grants +1 tile.', 'move', 1], ['Keen Eye', 'Reveal loot before the room clears.', 'roomDraw', 1], ['Second Pouch', 'Keep one extra consumable.', 'hand', 1], ['Sticky Hands', 'On a kill, claim a bonus coin.', 'killHeal', 1], ['Easy Mark', 'Foes you debuff deal 1 less.', 'debuffDamage', 1], ['Quick Escape', 'Discarding a card to move grants +2 tiles.', 'move', 2], ['Fence', 'Items restore +2 more HP or guard.', 'heal', 2], ['Cat Burglar', 'Artifact theft succeeds on 3+.', 'theft', 1]]
-  };
-
   const ITEMS = [
-    { id: 'tonic', name: 'Red Tonic', kind: 'consumable', text: 'Heal 4 HP.', effect: { heal: 4 } },
-    { id: 'smoke-vial', name: 'Smoke Vial', kind: 'consumable', text: 'Gain 5 guard; your next move gains 2 extra tiles.', effect: { shield: 5, move: 2 } },
-    { id: 'fire-oil', name: 'Fire Oil', kind: 'consumable', text: 'Your next attack deals +3 damage.', effect: { buff: 'nextAttack', buffPower: 3 } },
-    { id: 'salt-pouch', name: 'Salt & Silver', kind: 'consumable', text: 'Deal 3 damage and cleanse a curse.', effect: { damage: 3, range: 3, cleanse: 1 } },
-    { id: 'iron-charm', name: 'Iron Saint Charm', kind: 'permanent', text: 'Start each fight with 2 guard. Knights gain 1 more.', effect: { startGuard: 2 }, classBonus: { Knight: 1 } },
-    { id: 'raven-ring', name: 'Raven Ring', kind: 'permanent', text: '+1 card each turn. Wizards draw one extra.', effect: { hand: 1 }, classBonus: { Wizard: 1 } },
-    { id: 'wolf-cloak', name: 'Wolfskin Cloak', kind: 'permanent', text: '+1 movement; Rangers gain +1 more.', effect: { move: 1 }, classBonus: { Ranger: 1 } },
-    { id: 'red-belt', name: 'Red Belt', kind: 'permanent', text: '+1 attack damage. Barbarians heal 1 on a kill.', effect: { damage: 1 }, classBonus: { Barbarian: 1 } },
-    { id: 'needle', name: 'Weaver’s Needle', kind: 'permanent', text: 'Healing +1; Weavers draw a card on every heal.', effect: { heal: 1 }, classBonus: { Weaver: 1 } },
-    { id: 'duel-glove', name: 'Duelist’s Glove', kind: 'permanent', text: 'Deal +1 to your focused foe. Swordsmen gain +1 more.', effect: { focusDamage: 1 }, classBonus: { Swordsman: 1 } },
-    { id: 'tower-shield', name: 'Tower Shield', kind: 'permanent', text: '+2 guard from defense cards. Knights cannot be pushed.', effect: { shield: 2 }, classBonus: { Knight: 1 } },
-    { id: 'fox-coin', name: 'Fox-Eye Coin', kind: 'permanent', text: 'Draw a card on a kill. Rogues succeed at theft on 3+.', effect: { killDraw: 1 }, classBonus: { Rogue: 1 } }
+    { id: 'tonic', name: 'Grave Tonic', kind: 'consumable', text: 'Heal 4 HP.', effect: { heal: 4 } },
+    { id: 'smoke-vial', name: 'Ashen Shroud', kind: 'consumable', text: 'Gain 5 guard; your next move gains 2 extra tiles.', effect: { shield: 5, move: 2 } },
+    { id: 'fire-oil', name: 'Necrotic Oil', kind: 'consumable', text: 'Your next attack deals +3 damage.', effect: { buff: 'nextAttack', buffPower: 3 } },
+    { id: 'salt-pouch', name: 'Grave Salt', kind: 'consumable', text: 'Deal 3 damage and cleanse a curse.', effect: { damage: 3, range: 3, cleanse: 1 } },
+    { id: 'iron-charm', name: 'Ossuary Saint Charm', kind: 'permanent', text: 'Start each fight with 2 guard. Knights gain 1 more.', effect: { startGuard: 2 }, classBonus: { Knight: 1 } },
+    { id: 'raven-ring', name: 'Bone Raven Ring', kind: 'permanent', text: '+1 card each turn. Wizards draw one extra.', effect: { hand: 1 }, classBonus: { Wizard: 1 } },
+    { id: 'wolf-cloak', name: 'Pale Hound Shroud', kind: 'permanent', text: '+1 movement; Rangers gain +1 more.', effect: { move: 1 }, classBonus: { Ranger: 1 } },
+    { id: 'red-belt', name: 'Bloodied War Sash', kind: 'permanent', text: '+1 attack damage. Barbarians heal 1 on a kill.', effect: { damage: 1 }, classBonus: { Barbarian: 1 } },
+    { id: 'needle', name: 'Graveweaver Needle', kind: 'permanent', text: 'Healing +1; Weavers draw a card on every heal.', effect: { heal: 1 }, classBonus: { Weaver: 1 } },
+    { id: 'duel-glove', name: 'Bone Duelist’s Glove', kind: 'permanent', text: 'Deal +1 to your focused foe. Swordsmen gain +1 more.', effect: { focusDamage: 1 }, classBonus: { Swordsman: 1 } },
+    { id: 'tower-shield', name: 'Ossuary Tower Shield', kind: 'permanent', text: '+2 guard from defense cards. Knights cannot be pushed.', effect: { shield: 2 }, classBonus: { Knight: 1 } },
+    { id: 'fox-coin', name: 'Black Coin', kind: 'permanent', text: 'Draw a card when you defeat an enemy.', effect: { killDraw: 1 } }
   ];
 
   const MODIFIERS = [
-    { id: 'moon-slit', name: 'Moon-Slit Windows', buff: 'Players have +1 range.', debuff: 'Only 1 attack card per player per turn.', hero: { range: 1 }, rule: 'limit_attack' },
-    { id: 'old-favor', name: 'An Old Favor', buff: 'The first ally heal each round restores +2.', debuff: 'Enemys first attack each round deals +1.', enemy: { damage: 1 }, rule: 'favor' },
-    { id: 'echoing-hall', name: 'Echoing Hall', buff: 'Hand size +1.', debuff: 'Only one card of each type per turn.', hero: { hand: 1 }, rule: 'one_category' },
-    { id: 'loose-stone', name: 'Loose Stonework', buff: 'Pushes deal +2 damage.', debuff: 'Discard moves lose 1 tile (minimum 1).', hero: { pushDamage: 2 }, rule: 'rough_move' },
-    { id: 'lantern-tax', name: 'Lantern Tax', buff: 'Room-clear healing restores 2 HP.', debuff: 'The party begins this room with 1 less card.', rule: 'dim_start' },
-    { id: 'red-rain', name: 'Red Rain', buff: 'Attacks deal +1 damage.', debuff: 'Healing is reduced by 1.', hero: { damage: 1 }, rule: 'blood-price' }
+    { id: 'moon-slit', name: 'Grave-Light Slits', buff: 'Players have +1 range.', debuff: 'Only 1 attack card per player per turn.', hero: { range: 1 }, rule: 'limit_attack' },
+    { id: 'old-favor', name: 'The Keep Remembers', buff: 'The first ally heal each round restores +2.', debuff: 'The first enemy attack each round deals +1.', enemy: { damage: 1 }, rule: 'favor' },
+    { id: 'echoing-hall', name: 'Whispering Bones', buff: 'Hand size +1.', debuff: 'Only one card of each type per turn.', hero: { hand: 1 }, rule: 'one_category' },
+    { id: 'loose-stone', name: 'Shifting Barrow Stones', buff: 'Pushes deal +2 damage.', debuff: 'Discard moves lose 1 tile (minimum 1).', hero: { pushDamage: 2 }, rule: 'rough_move' },
+    { id: 'lantern-tax', name: 'Soul-Starved Dark', buff: 'Room-clear healing restores 2 HP.', debuff: 'The party begins this room with 1 less card.', rule: 'dim_start' },
+    { id: 'red-rain', name: 'Necrotic Drizzle', buff: 'Attacks deal +1 damage.', debuff: 'Healing is reduced by 1.', hero: { damage: 1 }, rule: 'blood-price' }
   ];
 
   const ENEMY_NAMES = {
-    1: ['Guard', 'Soldier', 'Archer', 'Guard Dog'], 2: ['Soldier', 'Archer', 'Guard Dog', 'Horse'],
-    3: ['Guard', 'Horse', 'Archer', 'Soldier'], 4: ['Guard Dog', 'Soldier', 'Horse', 'Archer'],
-    5: ['Archer', 'Soldier', 'Horse', 'Guard Dog'], 6: ['King', 'Guard', 'Archer'],
-    7: ['Monster', 'Skeleton', 'Zombie', 'Beast'], 8: ['Skeleton', 'Zombie', 'Beast', 'Monster'],
-    9: ['Zombie', 'Monster', 'Skeleton', 'Beast'], 10: ['Beast', 'Skeleton', 'Zombie', 'Monster'],
-    11: ['Monster', 'Beast', 'Zombie', 'Skeleton'], 12: ['Basilisk', 'Cockatrice', 'Gryphon', 'Zombie']
+    1: ['Skeletal Guard', 'Skeletal Soldier', 'Bone Archer', 'Zombie Hound'],
+    2: ['Skeletal Soldier', 'Bone Archer', 'Zombie Hound', 'Skeletal Horse'],
+    3: ['Skeletal Guard', 'Skeletal Horse', 'Bone Archer', 'Skeletal Soldier'],
+    4: ['Zombie Hound', 'Skeletal Soldier', 'Skeletal Horse', 'Bone Archer'],
+    5: ['Bone Archer', 'Skeletal Soldier', 'Skeletal Horse', 'Zombie Hound'],
+    6: ['Giant Skeleton King', 'Skeletal Guard', 'Bone Archer', 'Zombie Hound']
   };
 
-  const getAbilityList = (className, subclass) => (subclass ? (SUB_ABILITIES[subclass] || []) : (ABILITIES[className] || []));
+  const getAbilityList = (className) => ABILITIES[className] || [];
   const clone = (value) => JSON.parse(JSON.stringify(value));
-  return { CLASS_ORDER, CLASSES, DECKS, SUBCLASSES, ABILITIES, SUB_ABILITIES, ITEMS, MODIFIERS, ENEMY_NAMES, getAbilityList, clone };
+  return { CLASS_ORDER, CLASSES, DECKS, ABILITIES, ITEMS, MODIFIERS, ENEMY_NAMES, getAbilityList, clone };
 });
+
